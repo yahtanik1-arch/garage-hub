@@ -73,3 +73,7 @@ def webapp_url() -> str:
 # Режим разработки: вход без Telegram, только с локального адреса. На сервере НЕ включать.
 MINIAPP_DEV = os.getenv("MINIAPP_DEV", "").lower() in ("1", "true", "yes")
 INIT_DATA_MAX_AGE_SEC = 24 * 3600
+
+# Пустой URL сохраняет long polling для локальной разработки.
+TELEGRAM_WEBHOOK_URL = (os.getenv("TELEGRAM_WEBHOOK_URL") or "").strip()
+TELEGRAM_WEBHOOK_SECRET = (os.getenv("TELEGRAM_WEBHOOK_SECRET") or "").strip()

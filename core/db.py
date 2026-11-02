@@ -195,3 +195,18 @@ async def close_owner_request(request_id) -> Optional[dict]:
     return _first(await _run(
         _owner_requests().update({"status": "done"}).eq("id", int(request_id)).eq("status", "new")
     ))
+
+
+# ─── Доставка событий Telegram ─────────────────────────────
+
+async def telegram_update_processed(bot_id: int, update_id: int) -> bool:
+    return bool(await _run(
+        supabase.table("telegram_updates").select("update_id")
+        .eq("bot_id", bot_id).eq("update_id", update_id).limit(1)
+    ))
+
+
+async def mark_telegram_update_processed(bot_id: int, update_id: int) -> None:
+    await _run(supabase.table("telegram_updates").upsert(
+        {"bot_id": bot_id, "update_id": update_id}, on_conflict="bot_id,update_id",
+    ))

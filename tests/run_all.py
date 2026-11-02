@@ -12,6 +12,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SUITES = [
+    ("Telegram webhook (без внешних сервисов)", "t_webhook.py"),
     ("Разбор времени", "t_utils.py"),
     ("API Mini App", "t_api.py"),
     ("Сценарии бота", "t_all.py"),

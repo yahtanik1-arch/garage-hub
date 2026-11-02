@@ -2,6 +2,7 @@
 Запускается из корня проекта через bot.py или start.sh."""
 import asyncio
 import logging
+import signal
 import time
 from logging.handlers import RotatingFileHandler
 
@@ -9,7 +10,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.memory import MemoryStorage, SimpleEventIsolation
 from aiogram.types import (
     BotCommand, BotCommandScopeChat, BotCommandScopeDefault, ErrorEvent, MenuButtonDefault,
     MenuButtonWebApp, WebAppInfo,
@@ -20,7 +21,11 @@ from tgbot import keyboards as kb
 from tgbot import reminders
 from tgbot import texts as t
 from api.server import start_web
-from core.config import ADMIN_IDS, LOGS_DIR, TOKEN, WEB_PORT, supabase, webapp_url
+from core.config import (
+    ADMIN_IDS, LOGS_DIR, TELEGRAM_WEBHOOK_SECRET, TELEGRAM_WEBHOOK_URL, TOKEN,
+    WEB_PORT, supabase, webapp_url,
+)
+from tgbot.webhook import validate_config
 from tgbot.handlers import admin_bookings, admin_objects, booking, common, owners, search
 
 log = logging.getLogger("garagehub")
@@ -39,7 +44,7 @@ def setup_logging() -> None:
 
 
 def build_dispatcher() -> Dispatcher:
-    dp = Dispatcher(storage=MemoryStorage())
+    dp = Dispatcher(storage=MemoryStorage(), events_isolation=SimpleEventIsolation())
     # Порядок важен: сначала меню (срабатывает в любом состоянии), потом сценарии.
     dp.include_routers(
         common.router,
@@ -96,6 +101,8 @@ def check_schema() -> bool:
         supabase.table("garages").select("is_active, open_hour, close_hour").limit(1).execute()
         supabase.table("bookings").select("admin_reminded, client_wait_notified, visit_reminded").limit(1).execute()
         supabase.table("owner_requests").select("id").limit(1).execute()
+        if TELEGRAM_WEBHOOK_URL:
+            supabase.table("telegram_updates").select("bot_id, update_id").limit(1).execute()
         return True
     except Exception as e:
         log.error("База не обновлена: %s", e)
@@ -183,33 +190,67 @@ async def refresh_admin_button(bot: Bot, admin_id: int, previous_id):
         return None
 
 
+async def wait_for_shutdown() -> None:
+    stopped = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stopped.set)
+    try:
+        await stopped.wait()
+    finally:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.remove_signal_handler(sig)
+
+
 async def main() -> None:
     setup_logging()
+    validate_config(TELEGRAM_WEBHOOK_URL, TELEGRAM_WEBHOOK_SECRET)
     if not check_schema():
-        log.error("Выполните sql/001_v2.sql в Supabase → SQL Editor и перезапустите бота.")
+        log.error("Выполните sql/001_v2.sql; для webhook также sql/002_telegram_updates.sql, затем перезапустите бота.")
         return
 
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = build_dispatcher()
-    me = await bot.get_me()
-    await setup_commands(bot)
-    await setup_profile(bot)
-    reminder_task = asyncio.create_task(reminders.run(bot))
-    menu_task = asyncio.create_task(sync_menu_button(bot))
+    tasks = []
     web_runner = None
+    webhook_started = False
     try:
-        web_runner = await start_web(bot)
-    except OSError as e:
-        log.warning("Веб-часть Mini App не запущена (порт %s занят?): %s", WEB_PORT, e)
-    log.info("GarageHub запущен: @%s", me.username)
-    try:
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        me = await bot.get_me()
+        await setup_commands(bot)
+        await setup_profile(bot)
+        try:
+            web_runner = await start_web(bot, dp)
+        except OSError as e:
+            if TELEGRAM_WEBHOOK_URL:
+                raise  # Без HTTP-сервера webhook принимать некому.
+            log.warning("Веб-часть Mini App не запущена (порт %s занят?): %s", WEB_PORT, e)
+
+        tasks = [asyncio.create_task(reminders.run(bot)), asyncio.create_task(sync_menu_button(bot))]
+        if TELEGRAM_WEBHOOK_URL:
+            await dp.emit_startup(bot=bot)
+            webhook_started = True
+            await bot.set_webhook(
+                TELEGRAM_WEBHOOK_URL, secret_token=TELEGRAM_WEBHOOK_SECRET,
+                allowed_updates=dp.resolve_used_update_types(), drop_pending_updates=False,
+            )
+            log.info("GarageHub запущен: @%s, webhook", me.username)
+            await wait_for_shutdown()
+        else:
+            await bot.delete_webhook(drop_pending_updates=False)
+            log.info("GarageHub запущен: @%s, long polling", me.username)
+            await dp.start_polling(
+                bot, allowed_updates=dp.resolve_used_update_types(), close_bot_session=False,
+            )
     finally:
-        reminder_task.cancel()
-        menu_task.cancel()
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         if web_runner:
             await web_runner.cleanup()
+        if webhook_started:
+            await dp.emit_shutdown(bot=bot)
         await bot.session.close()
+        # Webhook оставляем зарегистрированным: Telegram доставит события после перезапуска.
         log.info("GarageHub остановлен")
 
 

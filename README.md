@@ -3,6 +3,8 @@
 Почасовая аренда гаражей самообслуживания и детейлинг-боксов в Москве и области.
 Telegram-бот [@garazh_rent_bot](https://t.me/garazh_rent_bot) + Mini App внутри Telegram + первая версия сайта (`site/`, [план](docs/SITE_PLAN.md)).
 
+Целевая архитектура с Telegram webhook и замками Tuya — [системный дизайн](docs/SYSTEM_DESIGN.md).
+
 ## Установка с нуля (для разработчика)
 
 Нужен Python 3.9 (проект проверен на 3.9.6: синтаксис 3.10+ не использовать).
@@ -27,6 +29,41 @@ cd ~/Desktop/garage_bot && ./start.sh
 
 Интерфейс Mini App без Telegram: `WEB_PORT=8081 python3 -m tools.dev_web` → http://localhost:8081/?dev=client (или `?dev=admin`).
 
+## Telegram webhook на сервере
+
+Локальный запуск по умолчанию использует long polling. Для сервера с постоянным HTTPS:
+
+1. Выполните `sql/002_telegram_updates.sql` в Supabase → SQL Editor.
+2. Создайте секрет: `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`.
+3. Укажите в `.env`:
+
+```dotenv
+WEBAPP_URL=https://example.com
+TELEGRAM_WEBHOOK_URL=https://example.com/telegram/webhook
+TELEGRAM_WEBHOOK_SECRET=секрет_из_шага_2
+```
+
+4. Настройте HTTPS reverse proxy: `/telegram/webhook` (POST), `/api/` и Mini App
+   должны пересылаться на `127.0.0.1:8080`. Не удаляйте заголовок
+   `X-Telegram-Bot-Api-Secret-Token`. Затем запустите `python3 bot.py`.
+
+Бот сам регистрирует webhook после запуска HTTP-сервера. Webhook требует секретный
+заголовок, а маршруты Mini App по-прежнему проверяют подпись Telegram. Тестовый
+`tools.dev_web` не регистрирует webhook и не принимает события бота.
+
+Ответ HTTP 200 возвращается после обработки события и сохранения его ID в базе.
+Одновременные копии выполняют один обработчик; обработанные ID переживают перезапуск.
+При необработанной ошибке возвращается HTTP 500, чтобы Telegram повторил доставку.
+Это не гарантия exactly-once: авария после бизнес-действия, но до сохранения ID
+может привести к повтору. Критические действия должны иметь собственную идемпотентность;
+будущая команда замку потребует отдельной записи команды и проверки результата.
+
+Запускайте **один экземпляр бота**: состояния диалогов и координация одновременных
+событий пока хранятся в памяти. При остановке webhook не удаляется. Для возврата к
+polling остановите webhook-экземпляр, удалите обе настройки `TELEGRAM_WEBHOOK_*`
+и запустите бота: он снимет webhook, сохранив ожидающие события.
+Временный туннель с меняющимся адресом для webhook не используйте.
+
 ## Сайт
 
 ```bash
@@ -45,6 +82,8 @@ cd ~/Desktop/garage_bot && source venv/bin/activate && python3 tests/run_all.py
 ```
 
 Все тесты одной командой; в конце тестовые данные удаляются сами, в настоящий Telegram ничего не уходит.
+API и сценарии бота требуют настроенную Supabase. Проверки webhook выполняются отдельно
+без `.env`, Telegram и внешней базы: `python3 tests/t_webhook.py`.
 
 ## Устройство
 

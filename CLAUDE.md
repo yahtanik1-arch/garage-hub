@@ -186,3 +186,20 @@ cd ~/Desktop/garage_bot && source venv/bin/activate && python3 tests/run_all.py
 - `tests/harness.py` — фейковый Telegram + **настоящая база**; клиент id 900000001 «пишет» и «жмёт кнопки».
 - `t_utils.py` — разбор времени; `t_api.py` — API, права, безопасность (≈60 проверок); `t_all.py` — сценарии бота (сам создаёт объект «ТЕСТ Бокс»).
 - `cleanup.py` удаляет заявки клиента 900000001 и объекты с названием на «ТЕСТ».
+
+
+## Telegram webhook (02.11.2026)
+
+- Локально по умолчанию остаётся polling. Для сервера: `TELEGRAM_WEBHOOK_URL=https://домен/telegram/webhook`
+  и `TELEGRAM_WEBHOOK_SECRET` (случайный секрет), сначала выполнить `sql/002_telegram_updates.sql`.
+- `tgbot/webhook.py` проверяет секретный заголовок, валидирует Update, объединяет одновременные копии
+  и сохраняет обработанные `(bot_id, update_id)` в Supabase через `core/db.py`. HTTP 200 — после обработки и записи.
+- `api/server.py` добавляет POST `/telegram/webhook` только при наличии dispatcher и настроенного URL.
+  `tools.dev_web` dispatcher не передаёт, поэтому события бота там недоступны.
+- `tgbot/app.py` регистрирует webhook после запуска HTTP-сервера; при остановке оставляет его зарегистрированным.
+  При возврате к polling снимает webhook без удаления ожидающих событий. SIGINT/SIGTERM корректно закрывают веб-режим.
+- Один экземпляр бота: FSM и координация текущих событий в памяти. Авария между бизнес-действием и записью ID
+  оставляет окно для повтора; команды будущим замкам требуют собственной идемпотентности.
+- `python3 tests/t_webhook.py` — автономные тесты без реальных Telegram/Supabase; включены в `tests/run_all.py`.
+
+Целевая архитектура webhook + Tuya, модель команд и условия запуска оборудования: `docs/SYSTEM_DESIGN.md`.
