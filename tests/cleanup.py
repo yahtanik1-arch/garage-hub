@@ -1,9 +1,12 @@
+"""Очищает только выделенную локальную тестовую базу, включая команды/права."""
 import sys
-sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
-from core import config
-r = config.supabase.table("bookings").delete().eq("client_telegram_id", 900000001).execute()
-print("удалено тестовых заявок:", len(r.data or []))
-r = config.supabase.table("owner_requests").delete().eq("telegram_id", 900000001).execute()
-print("удалено тестовых заявок владельцев:", len(r.data or []))
-r = config.supabase.table("garages").delete().like("name", "ТЕСТ%").execute()
-print("удалено тестовых объектов:", len(r.data or []))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from local_guard import require_local_database
+require_local_database()
+from tools.local_db import sql
+
+sql("TRUNCATE device_events, audit_log, notification_outbox, lock_commands, unlock_actions, "
+    "access_grants, lock_devices, bookings, garages, owner_requests, telegram_updates, service_heartbeats "
+    "RESTART IDENTITY CASCADE;")
+print("Изолированная локальная база очищена.")

@@ -2,6 +2,8 @@
 import asyncio, logging, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from local_guard import require_local_database
+require_local_database()
 logging.basicConfig(level=logging.ERROR)
 import harness
 harness.VERBOSE = False
@@ -28,7 +30,7 @@ async def main():
         (c, "click", "Отменить заявку"), (c, "click", "Да, отменить"),
         (a, "send", "/start"), (a, "send", "Все объекты"), (a, "click", "ТЕСТ"), (a, "click", "Как видит клиент"),
         (a, "click", "Удалить"), (a, "click", "Да, удалить"),
-        (c, "send", "/find"), (c, "click", "Показать"),
+        (c, "send", "/find"),
     ]
     failed = None
     try:

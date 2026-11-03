@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 
 from core import db
 from tgbot import keyboards as kb
-from core import service
+from core import service, locks
 from tgbot import texts as t
 from tgbot.callbacks import BookCb, MyCb
 from tgbot.states import Booking
@@ -182,7 +182,9 @@ async def own_booking(callback: CallbackQuery, booking_id: int):
 async def show_my_card(callback: CallbackQuery, b: dict) -> None:
     g = await db.garage(b["garage_id"])
     start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
-    await edit_or_send(callback.message, t.my_booking_card(b, g, start, end), kb.my_booking_card(b, g, service.can_cancel(b)))
+    action = await locks.action_for_booking(b["id"], callback.from_user.id)
+    await edit_or_send(callback.message, t.my_booking_card(b, g, start, end),
+        kb.my_booking_card(b, g, service.can_cancel(b), action["id"] if action else None))
 
 
 @router.callback_query(MyCb.filter())

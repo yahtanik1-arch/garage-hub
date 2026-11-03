@@ -4,3 +4,4 @@ aiohttp==3.12.15
 httpx==0.28.1
 python-dotenv==1.2.1
 supabase==2.32.0
+postgrest==2.32.0

@@ -773,3 +773,21 @@ def error_for_admin(where: str, error: Exception) -> str:
         f"<code>{h(clip(f'{type(error).__name__}: {error}', 600))}</code>\n\n"
         "<i>Бот продолжает работать. Подробности — в logs/bot.log.</i>"
     )
+
+def lock_result(command):
+    labels = {
+        "queued": "Запрос на открытие зарегистрирован.",
+        "dispatching": "Команда отправляется. Дождитесь результата.",
+        "cloud_accepted": "Команда принята облаком. Подтверждения замка пока нет.",
+        "device_confirmed": "Получено подтверждение разблокировки замка.",
+        "failed": "Открытие не выполнено. Обратитесь к администратору.",
+        "expired": "Время ожидания истекло. Команда не отправлена.",
+        "cancelled": "Открытие отменено до отправки команды.",
+        "unknown": "Результат неизвестен. Повторная отправка заблокирована. Требуется проверка администратора.",
+    }
+    text = labels[command["state"]]
+    if command.get("simulated"):
+        text = "Тестовый замок. " + text
+    if command.get("result_code") == "operator_resolution":
+        text += " Результат зафиксирован оператором."
+    return text

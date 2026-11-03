@@ -9,6 +9,8 @@ import { callPhone, haptic, openTelegramLink } from "../tg.js";
 import { emptyState, errorState, hoursText, statusLabel, thumb } from "../ui/cards.js";
 import { openSheet } from "../ui/sheet.js";
 import { toast } from "../ui/toast.js";
+import { lockRows, manualUnlock, resolveLock, configureLock } from "../ui/locks.js";
+import { state } from "../store.js";
 
 const REASONS = ["Это время уже занято", "Площадка в этот день не работает", "На площадке технические работы"];
 const SECTIONS = [
@@ -16,12 +18,15 @@ const SECTIONS = [
   { id: "day", label: "Расписание" },
   { id: "objects", label: "Объекты" },
   { id: "leads", label: "Владельцы", count: "leads" },
+  { id: "locks", label: "Замки" },
 ];
 
 let section = "inbox";
 let dayOffset = 0;
 let summary = null;
-const items = { inbox: [], day: null, objects: [], leads: [] };
+const items = { inbox: [], day: null, objects: [], leads: [], locks: [] };
+let canOperate = false;
+let queue = null;
 
 /* ── Помощники ──────────────────────────────────────────── */
 
@@ -126,6 +131,7 @@ function objectSheet(g) {
     </dl>
     ${g.is_active && g.upcoming ? html`<p class="alert mt-l">У объекта ${g.upcoming} активных броней. После переноса в архив клиенты их не потеряют, но решение по ним за вами.</p>` : ""}
     <div class="mt-xl">
+      ${canOperate ? html`<button class="btn secondary l block" data-action="configureLock">Настроить замок</button>` : ""}
       ${g.is_active
         ? html`<button class="btn danger l block" data-action="archive">${icon("archive")}Убрать в архив</button>`
         : html`<button class="btn primary l block" data-action="restore">${icon("restore")}Вернуть в каталог</button>`}
@@ -149,6 +155,10 @@ function objectSheet(g) {
       tg: (el) => openTelegramLink(`https://t.me/${el.dataset.handle}`),
       archive: setActive(api.admin.archive, "Объект убран в архив"),
       restore: setActive(api.admin.restore, "Объект снова в каталоге"),
+      configureLock() {
+        sheet.close();
+        configureLock(g.id, items.locks.find((d) => d.garage_id === g.id), loadSection);
+      },
     },
   });
 }
@@ -175,7 +185,17 @@ function tabsMarkup() {
   })}</div>`;
 }
 
-const sectionMarkup = () => ({ inbox: inboxMarkup, day: dayMarkup, objects: objectsMarkup, leads: leadsMarkup }[section]());
+const sectionMarkup = () => ({ inbox: inboxMarkup, day: dayMarkup, objects: objectsMarkup, leads: leadsMarkup,
+  locks: () => html`${queue ? html`<p class="caption">Незавершённых команд: ${queue.commands.length}${queue.commands.length === queue.limit ? "+" : ""}.
+    Ожидают уведомления: ${queue.notifications.length}${queue.notifications.length === queue.limit ? "+" : ""}.
+    ${heartbeatLabel()}.</p>` : ""}
+    ${lockRows(items.locks, canOperate)}<button class="btn secondary mt-l" data-action="refreshLocks">Обновить</button>` }[section]());
+
+function heartbeatLabel() {
+  const value = queue?.heartbeats.find((h) => h.name === "worker")?.seen_at;
+  if (!value || Date.now() - new Date(value).getTime() > 60000) return "Обработка очереди давно не подтверждалась";
+  return "Очередь проверена: " + new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
 
 async function loadSummary() {
   try { summary = await api.admin.summary(); patch("#tabs", tabsMarkup()); } catch { /* не критично */ }
@@ -186,7 +206,8 @@ async function loadSection() {
     if (section === "inbox") items.inbox = (await api.admin.inbox()).bookings;
     else if (section === "day") items.day = await api.admin.day(dayOffset);
     else if (section === "objects") items.objects = (await api.admin.garages()).garages;
-    else items.leads = (await api.admin.leads()).leads;
+    else if (section === "leads") items.leads = (await api.admin.leads()).leads;
+    else { const data = await api.admin.locks(); items.locks = data.locks; canOperate = data.can_operate; queue = data.queue; }
     patch("#section", sectionMarkup());
   } catch (e) {
     patch("#section", errorState(e.message));
@@ -220,7 +241,7 @@ async function confirm(el) {
   try {
     const { booking, delivered } = await api.admin.confirm(Number(el.dataset.id));
     haptic.success();
-    toast(delivered ? "Подтверждено, клиент получил сообщение" : "Подтверждено, но сообщение клиенту не дошло");
+    toast(delivered ? "Подтверждено, клиент получил сообщение" : "Подтверждено, уведомление в очереди");
     applyDecision(booking);
   } catch (e) {
     el.classList.remove("is-loading");
@@ -239,7 +260,7 @@ function rejectSheet(id) {
     try {
       const { booking, delivered } = await api.admin.reject(id, text);
       sheet.close();
-      toast(delivered ? "Отказ отправлен клиенту" : "Отклонено, но сообщение клиенту не дошло");
+      toast(delivered ? "Отказ отправлен клиенту" : "Отклонено, уведомление в очереди");
       applyDecision(booking);
     } catch (e) {
       el.classList.remove("is-loading");
@@ -263,6 +284,7 @@ function rejectSheet(id) {
 /* ── Экран ──────────────────────────────────────────────── */
 
 async function enter(ctx) {
+  canOperate = Boolean(state.me?.can_operate_locks);
   render(ctx, html`
     <h1 class="title-xl">Управление</h1>
     <div class="mt-l" id="tabs">${tabsMarkup()}</div>
@@ -303,5 +325,8 @@ export default {
       }
     },
     retry: () => loadSection(),
+    refreshLocks: () => loadSection(),
+    manualUnlock: (el) => manualUnlock(el.dataset.id, loadSection),
+    resolveLock: (el) => resolveLock(el.dataset.id, loadSection),
   },
 };

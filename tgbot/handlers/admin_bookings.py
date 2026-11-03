@@ -102,7 +102,7 @@ async def on_decide(callback: CallbackQuery, callback_data: DecideCb, state: FSM
 
     if action == "ok":
         async with user_lock(callback.from_user.id):
-            result = await service.confirm_booking(callback.bot, bid)
+            result = await service.confirm_booking(callback.bot, bid, callback.from_user.id)
         if not result:
             await already_decided(callback, bid)
             return
@@ -110,7 +110,7 @@ async def on_decide(callback: CallbackQuery, callback_data: DecideCb, state: FSM
         await answer_quietly(callback, "Подтверждено. Клиент уведомлён." if delivered else "Подтверждено")
         await edit_or_send(callback.message, await booking_card(b, g))
         if not delivered:
-            await callback.message.answer("⚠ Не удалось отправить сообщение клиенту — возможно, он заблокировал бота.")
+            await callback.message.answer("Уведомление сохранено в очереди и будет отправлено повторно.")
         return
 
     if action == "no":
@@ -144,11 +144,11 @@ async def on_decide(callback: CallbackQuery, callback_data: DecideCb, state: FSM
             return
         reason = t.REJECT_REASONS.get(callback_data.reason, "Без указания причины")
         async with user_lock(callback.from_user.id):
-            result = await service.reject_booking(callback.bot, bid, reason)
+            result = await service.reject_booking(callback.bot, bid, reason, callback.from_user.id)
         if not result:
             await already_decided(callback, bid)
             return
-        await answer_quietly(callback, "Отклонено. Клиент уведомлён.")
+        await answer_quietly(callback, "Отклонено. Клиент уведомлён." if result[2] else "Отклонено. Уведомление в очереди.")
         await edit_or_send(callback.message, await booking_card(result[0], result[1]))
 
 
@@ -158,11 +158,11 @@ async def on_reject_reason(message: Message, state: FSMContext):
     await reset(state)
     if not data:
         return
-    result = await service.reject_booking(message.bot, data["booking_id"], message.text.strip())
+    result = await service.reject_booking(message.bot, data["booking_id"], message.text.strip(), message.from_user.id)
     if not result:
         await message.answer("Эта заявка уже обработана.", reply_markup=kb.admin_menu())
         return
-    await message.answer("Заявка отклонена, клиент уведомлён.", reply_markup=kb.admin_menu())
+    await message.answer("Заявка отклонена, клиент уведомлён." if result[2] else "Заявка отклонена. Уведомление в очереди.", reply_markup=kb.admin_menu())
     try:
         await message.bot.edit_message_text(
             await booking_card(result[0], result[1]), chat_id=data["chat_id"], message_id=data["message_id"],
