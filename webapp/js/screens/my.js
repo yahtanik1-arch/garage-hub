@@ -70,6 +70,7 @@ function detailsMarkup(b) {
     <div class="mt-l">${bookingProps(b)}</div>
     ${b.status === "pending" || b.status === "confirmed" ? html`<div class="mt-xl">${stepper(b.status)}</div>` : ""}
     <div class="stack mt-xl">
+      ${b.unlock_action ? html`<button class="btn primary l block" data-action="unlock">Открыть бокс</button>` : ""}
       ${b.status === "confirmed" ? html`<button class="btn secondary l block" data-action="route">${icon("route")}Показать на карте</button>` : ""}
       ${b.can_cancel
         ? html`<button class="btn danger l block" data-action="askCancel">Отменить заявку</button>`
@@ -79,8 +80,43 @@ function detailsMarkup(b) {
 
 function openDetails(b) {
   let sheet;
+  let command = null;
+  let sending = false;
+  const showCommand = () => sheet.update(html`
+    <h2 class="title-m">Открытие бокса</h2>
+    <p role="status" aria-live="polite">${command.message}</p>
+    ${command.simulated ? html`<p class="hint">Локальная проверка: физический замок не подключён.</p>` : ""}
+    <div class="actions">
+      ${command.terminal ? html`<button class="btn secondary l" data-action="backToBooking">Вернуться к брони</button>`
+        : html`<button class="btn secondary l" data-action="checkCommand">Проверить результат</button>`}
+    </div>`);
   sheet = openSheet(detailsMarkup(b), {
     actions: {
+      async unlock(el) {
+        if (sending) return;
+        sending = true;
+        el.disabled = true;
+        el.classList.add("is-loading");
+        try {
+          // Один серверный ключ сохраняется при сетевой ошибке и повторном клике.
+          command = await api.unlock(b.id, b.unlock_action);
+          showCommand();
+        } catch (e) { toast(e.message, "err"); }
+        finally { sending = false; el.disabled = false; el.classList.remove("is-loading"); }
+      },
+      async checkCommand(el) {
+        el.disabled = true;
+        try { command = await api.lockCommand(command.id); showCommand(); }
+        catch (e) { toast(e.message, "err"); }
+        finally { el.disabled = false; }
+      },
+      async backToBooking() {
+        if (await load(null, { silent: true })) {
+          const fresh = bookings.find((x) => x.id === b.id);
+          if (fresh) Object.assign(b, fresh);
+        }
+        sheet.update(detailsMarkup(b));
+      },
       route: () => openLink(mapUrl(b.garage)),
       again: () => { sheet.close(); go(`/g/${b.garage.id}/book`); },
       askCancel() {

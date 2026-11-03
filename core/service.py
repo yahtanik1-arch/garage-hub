@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from aiogram import Bot
+from postgrest.exceptions import APIError
 
 from core import db
 from tgbot import keyboards as kb
@@ -128,15 +129,20 @@ async def create_booking_request(bot: Bot, user_id: int, username: Optional[str]
             raise ServiceError("taken", t.SLOT_TAKEN, 409)
         start, end = at_hour(day, hours[0]), at_hour(day, hours[-1] + 1)
         total = len(hours) * float(g.get("price_per_hour") or 0)
-        created = await db.create_booking({
-            "garage_id": g["id"],
-            "client_telegram_id": user_id,
-            "client_username": username,
-            "start_time": start.isoformat(),
-            "end_time": end.isoformat(),
-            "total_price": total,
-            "status": "pending",
-        })
+        try:
+            created = await db.create_booking({
+                "garage_id": g["id"],
+                "client_telegram_id": user_id,
+                "client_username": username,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "total_price": total,
+                "status": "pending",
+            })
+        except APIError as error:
+            if error.code == "23P01":  # exclusion constraint: гонка двух разных клиентов
+                raise ServiceError("taken", t.SLOT_TAKEN, 409) from None
+            raise
     if not created:
         raise ServiceError("save_failed", "Не удалось отправить заявку. Попробуйте ещё раз.", 500)
 
@@ -149,42 +155,29 @@ async def create_booking_request(bot: Bot, user_id: int, username: Optional[str]
 
 # ─── Решения по заявке ──────────────────────────────────────
 
-async def _notify(bot: Bot, chat_id: int, text: str, markup=None) -> bool:
-    try:
-        await bot.send_message(chat_id, text, reply_markup=markup)
-        return True
-    except Exception as e:
-        log.warning("Не удалось написать клиенту %s: %s", chat_id, e)
-        return False
-
-
-async def confirm_booking(bot: Bot, booking_id: int):
+async def confirm_booking(bot: Bot, booking_id: int, actor_id: int):
     """pending → confirmed. None, если заявку уже обработали. Иначе (заявка, объект, доставлено ли клиенту)."""
-    b = await db.change_booking_status(booking_id, "confirmed", ["pending"])
+    if actor_id not in ADMIN_IDS:
+        raise ServiceError("forbidden", "Раздел только для администратора.", 403)
+    b = await db.decide_booking(booking_id, "confirmed", actor_id)
     if not b:
         return None
     g = await db.garage(b["garage_id"]) or {}
-    start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
-    delivered = await _notify(
-        bot, b["client_telegram_id"],
-        t.confirmed_for_client(b["id"], g, start, end, b["total_price"]),
-        kb.after_confirm(g),
-    )
+    from core.notifications import try_booking_notification
+    delivered = await try_booking_notification(bot, booking_id)
     return b, g, delivered
 
 
-async def reject_booking(bot: Bot, booking_id: int, reason: str):
+async def reject_booking(bot: Bot, booking_id: int, reason: str, actor_id: int):
     """pending → rejected с причиной. None, если заявку уже обработали."""
-    b = await db.change_booking_status(booking_id, "rejected", ["pending"], comment=reason)
+    if actor_id not in ADMIN_IDS:
+        raise ServiceError("forbidden", "Раздел только для администратора.", 403)
+    b = await db.decide_booking(booking_id, "rejected", actor_id, reason)
     if not b:
         return None
     g = await db.garage(b["garage_id"]) or {}
-    start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
-    delivered = await _notify(
-        bot, b["client_telegram_id"],
-        t.rejected_for_client(b["id"], g.get("name") or "", start, end, reason),
-        kb.after_reject(),
-    )
+    from core.notifications import try_booking_notification
+    delivered = await try_booking_notification(bot, booking_id)
     return b, g, delivered
 
 
@@ -199,12 +192,12 @@ async def cancel_booking(bot: Bot, user_id: int, booking_id: int) -> dict:
         raise ServiceError("not_found", "Заявка не найдена.", 404)
     if not can_cancel(b):
         raise ServiceError("closed", "Эту заявку уже нельзя отменить.", 409)
-    updated = await db.change_booking_status(booking_id, "cancelled", db.ACTIVE_STATUSES)
+    updated = await db.decide_booking(booking_id, "cancelled", user_id)
     if not updated:
         raise ServiceError("changed", "Статус заявки уже изменился.", 409)
-    g = await db.garage(b["garage_id"])
-    start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
-    await notify_admins(bot, t.client_cancelled_for_admin(updated, (g or {}).get("name") or "—", start, end))
+    from core.notifications import try_booking_notification
+    for _ in ADMIN_IDS:
+        await try_booking_notification(bot, booking_id)
     return updated
 
 

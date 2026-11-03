@@ -23,12 +23,12 @@ function authHeader() {
   return "";
 }
 
-async function request(method, path, body) {
+async function request(method, path, body, headers = {}) {
   let response;
   try {
     response = await fetch(path, {
       method,
-      headers: { Authorization: authHeader(), ...(body ? { "Content-Type": "application/json" } : {}) },
+      headers: { Authorization: authHeader(), ...(body ? { "Content-Type": "application/json" } : {}), ...headers },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -54,6 +54,8 @@ export const api = {
   createBooking: (payload) => post("/api/bookings", payload),
   myBookings: () => get("/api/bookings"),
   cancelBooking: (id) => post(`/api/bookings/${id}/cancel`),
+  unlock: (id, key) => request("POST", `/api/bookings/${id}/unlock`, {}, { "Idempotency-Key": key }),
+  lockCommand: (id) => get(`/api/lock-commands/${id}`),
   ownerRequest: (payload) => post("/api/owner-requests", payload),
   admin: {
     summary: () => get("/api/admin/summary"),
@@ -66,5 +68,9 @@ export const api = {
     restore: (id) => post(`/api/admin/garages/${id}/restore`),
     leads: () => get("/api/admin/leads"),
     leadDone: (id) => post(`/api/admin/leads/${id}/done`),
+    locks: () => get("/api/admin/locks"),
+    setLock: (payload) => post("/api/admin/locks", payload),
+    unlock: (id, key, reason) => request("POST", `/api/admin/locks/${id}/unlock`, { reason }, { "Idempotency-Key": key }),
+    resolve: (id, state, reason) => post(`/api/admin/lock-commands/${id}/resolve`, { state, reason }),
   },
 };

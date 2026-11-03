@@ -3,6 +3,8 @@ import asyncio, hashlib, hmac, json, logging, os, sys, time
 from pathlib import Path
 from urllib.parse import urlencode
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from local_guard import require_local_database
+require_local_database()
 os.environ["MINIAPP_DEV"] = "1"
 os.environ["EXTRA_ADMIN_IDS"] = "900000002"   # второй админ для проверки
 logging.basicConfig(level=logging.ERROR)

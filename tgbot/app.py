@@ -26,7 +26,7 @@ from core.config import (
     WEB_PORT, supabase, webapp_url,
 )
 from tgbot.webhook import validate_config
-from tgbot.handlers import admin_bookings, admin_objects, booking, common, owners, search
+from tgbot.handlers import admin_bookings, admin_objects, booking, common, locks, owners, search
 
 log = logging.getLogger("garagehub")
 
@@ -51,6 +51,7 @@ def build_dispatcher() -> Dispatcher:
         admin_bookings.router,
         admin_objects.router,
         booking.router,
+        locks.router,
         search.router,
         owners.router,
     )
@@ -101,6 +102,8 @@ def check_schema() -> bool:
         supabase.table("garages").select("is_active, open_hour, close_hour").limit(1).execute()
         supabase.table("bookings").select("admin_reminded, client_wait_notified, visit_reminded").limit(1).execute()
         supabase.table("owner_requests").select("id").limit(1).execute()
+        if not supabase.rpc("gh_readiness").execute().data:
+            return False
         if TELEGRAM_WEBHOOK_URL:
             supabase.table("telegram_updates").select("bot_id, update_id").limit(1).execute()
         return True
@@ -206,8 +209,8 @@ async def main() -> None:
     setup_logging()
     validate_config(TELEGRAM_WEBHOOK_URL, TELEGRAM_WEBHOOK_SECRET)
     if not check_schema():
-        log.error("Выполните sql/001_v2.sql; для webhook также sql/002_telegram_updates.sql, затем перезапустите бота.")
-        return
+        log.error("Примените миграции sql/000–003 по README и перезапустите бота.")
+        raise RuntimeError("База или её схема недоступна")
 
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = build_dispatcher()
