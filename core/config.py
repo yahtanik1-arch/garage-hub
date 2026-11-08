@@ -1,6 +1,7 @@
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -11,24 +12,44 @@ BASE_DIR = Path(__file__).resolve().parent.parent   # корень проект�
 load_dotenv(BASE_DIR / ".env")
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_PROXY_URL = os.getenv("TELEGRAM_PROXY_URL", "").strip()
+if TELEGRAM_PROXY_URL:
+    try:
+        proxy_endpoint = urlsplit(TELEGRAM_PROXY_URL)
+        proxy_valid = (proxy_endpoint.scheme in ("socks5", "http") and proxy_endpoint.hostname
+            and proxy_endpoint.port is not None and proxy_endpoint.port > 0
+            and proxy_endpoint.path in ("", "/")
+            and not proxy_endpoint.query and not proxy_endpoint.fragment)
+    except ValueError:
+        proxy_valid = False
+    if not proxy_valid:
+        # В URL могут быть логин/пароль: не включать его в исключение.
+        raise RuntimeError("TELEGRAM_PROXY_URL: требуется socks5://host:port или http://host:port")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
 APP_ENV = os.getenv("APP_ENV", "production")
-# Прямой PostgREST только для локального стенда; production остаётся на Supabase.
+# Собственная PostgreSQL доступна приложению через PostgREST на loopback.
 POSTGREST_URL = os.getenv("POSTGREST_URL", "").strip()
 LOCK_PROVIDER = os.getenv("LOCK_PROVIDER", "disabled")
 MANUAL_UNLOCK_ADMIN_IDS = [int(x) for x in re.split(r"[,\s]+", os.getenv("MANUAL_UNLOCK_ADMIN_IDS", ""))
                            if x.strip().isdigit()]
 if APP_ENV not in ("local", "production") or LOCK_PROVIDER not in ("disabled", "simulator"):
     raise RuntimeError("Некорректные APP_ENV/LOCK_PROVIDER")
-if (POSTGREST_URL or LOCK_PROVIDER == "simulator") and APP_ENV != "local":
-    raise RuntimeError("PostgREST стенд и имитатор разрешены только с APP_ENV=local")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "5121580545"))   # главный админ (владелец проекта)
+if LOCK_PROVIDER == "simulator" and APP_ENV != "local":
+    raise RuntimeError("Имитаторы разрешены только с APP_ENV=local")
+if POSTGREST_URL:
+    endpoint = urlsplit(POSTGREST_URL)
+    allowed_hosts = ("localhost", "127.0.0.1", "::1") + (("rest",) if APP_ENV == "local" else ())
+    if (endpoint.scheme != "http" or endpoint.hostname not in allowed_hosts
+            or endpoint.username is not None or endpoint.password is not None
+            or endpoint.query or endpoint.fragment or endpoint.path not in ("", "/")):
+        raise RuntimeError("PostgREST должен быть на loopback; имя rest разрешено только локально")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))   # указать владельца в .env; 0 не соответствует пользователю Telegram
 # Дополнительные админы с теми же правами: EXTRA_ADMIN_IDS=111,222 в .env. ID узнать командой /id в боте.
 EXTRA_ADMIN_IDS = [int(x) for x in re.split(r"[,\s]+", os.getenv("EXTRA_ADMIN_IDS", "")) if x.strip().isdigit()]
 ADMIN_IDS = [ADMIN_ID] + [x for x in EXTRA_ADMIN_IDS if x != ADMIN_ID]
-ADMIN_TG = os.getenv("ADMIN_TG", "@mamedov99999")
-ADMIN_PHONE = os.getenv("ADMIN_PHONE", "+7 (999) 462-47-30")
+ADMIN_TG = os.getenv("ADMIN_TG", "")
+ADMIN_PHONE = os.getenv("ADMIN_PHONE", "")
 
 if not TOKEN:
     raise RuntimeError("TELEGRAM_BOT_TOKEN не найден в .env")
@@ -46,9 +67,6 @@ _http = httpx.Client(
 )
 if POSTGREST_URL:
     from postgrest import SyncPostgrestClient
-    from urllib.parse import urlparse
-    if urlparse(POSTGREST_URL).hostname not in ("localhost", "127.0.0.1", "::1", "rest"):
-        raise RuntimeError("Локальный PostgREST должен быть на loopback или в compose-сети rest")
     supabase = SyncPostgrestClient(POSTGREST_URL, http_client=_http,
         headers={"Authorization": "Bearer " + SUPABASE_KEY})
 else:

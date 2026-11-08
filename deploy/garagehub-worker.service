@@ -1,6 +1,6 @@
 [Unit]
 Description=GarageHub durable command and notification worker
-After=network-online.target
+After=network-online.target garagehub-postgrest.service
 Wants=network-online.target
 
 [Service]

@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.update(
     TELEGRAM_BOT_TOKEN="123456:TESTTOKENTESTTOKENTESTTOKENTESTTOKEN",
     SUPABASE_URL="https://example.supabase.co", SUPABASE_SECRET_KEY="test-key",
+    POSTGREST_URL="", TELEGRAM_PROXY_URL="",
     TELEGRAM_WEBHOOK_URL="", TELEGRAM_WEBHOOK_SECRET="", MINIAPP_DEV="",
 )
 
@@ -281,7 +282,7 @@ class RealHandlerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StartupTests(unittest.IsolatedAsyncioTestCase):
-    async def run_mode(self, url, secret, bind_error=False):
+    async def run_mode(self, url, secret, bind_error=False, proxy=""):
         self.bot = SimpleNamespace(
             get_me=AsyncMock(return_value=SimpleNamespace(username="testbot")),
             set_webhook=AsyncMock(), delete_webhook=AsyncMock(),
@@ -292,9 +293,10 @@ class StartupTests(unittest.IsolatedAsyncioTestCase):
         for name in ("emit_startup", "emit_shutdown", "start_polling"):
             setattr(self.dp, name, AsyncMock())
         self.runner = SimpleNamespace(cleanup=AsyncMock())
-        with patch.multiple(app, TELEGRAM_WEBHOOK_URL=url, TELEGRAM_WEBHOOK_SECRET=secret), \
+        with patch.multiple(app, TELEGRAM_WEBHOOK_URL=url, TELEGRAM_WEBHOOK_SECRET=secret,
+                            TELEGRAM_PROXY_URL=proxy), \
                 patch.object(app, "setup_logging"), patch.object(app, "check_schema", return_value=True), \
-                patch.object(app, "Bot", return_value=self.bot), \
+                patch.object(app, "Bot", return_value=self.bot) as make_bot, \
                 patch.object(app, "build_dispatcher", return_value=self.dp), \
                 patch.object(app, "setup_commands", new_callable=AsyncMock), \
                 patch.object(app, "setup_profile", new_callable=AsyncMock), \
@@ -307,6 +309,22 @@ class StartupTests(unittest.IsolatedAsyncioTestCase):
             else:
                 start_web.return_value = self.runner
             await app.main()
+            self.assertEqual(make_bot.call_args.kwargs["session"].proxy, proxy or None)
+
+    async def test_webhook_uses_proxy_session(self):
+        await self.run_mode(URL, SECRET, proxy="socks5://127.0.0.1:1080")
+
+    async def test_worker_uses_proxy_session(self):
+        from core import worker
+        bot = SimpleNamespace(session=SimpleNamespace(close=AsyncMock()))
+        with patch.multiple(worker, APP_ENV="production", LOCK_PROVIDER="disabled",
+                            TELEGRAM_PROXY_URL="socks5://127.0.0.1:1080"), \
+                patch.object(worker, "Bot", return_value=bot) as make_bot, \
+                patch.object(worker.db, "readiness", new_callable=AsyncMock, return_value=True), \
+                patch.object(worker.Worker, "run", new_callable=AsyncMock):
+            await worker.main()
+        self.assertEqual(make_bot.call_args.kwargs["session"].proxy, "socks5://127.0.0.1:1080")
+        bot.session.close.assert_awaited_once()
 
     async def test_webhook_registration_and_shutdown(self):
         await self.run_mode(URL, SECRET)

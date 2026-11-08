@@ -7,10 +7,11 @@ import time
 
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 
 from core import db, notifications
-from core.config import APP_ENV, LOCK_PROVIDER, TOKEN
+from core.config import APP_ENV, LOCK_PROVIDER, TELEGRAM_PROXY_URL, TOKEN
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +79,8 @@ async def main(scenario="success"):
         from tools.local_bot import LocalBot
         bot = LocalBot(TOKEN)
     else:
-        bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+        bot = Bot(TOKEN, session=AiohttpSession(proxy=TELEGRAM_PROXY_URL or None),
+                  default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

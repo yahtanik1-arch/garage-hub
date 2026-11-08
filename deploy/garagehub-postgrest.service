@@ -1,0 +1,19 @@
+[Unit]
+Description=GarageHub private PostgreSQL REST interface
+After=postgresql@16-main.service
+Requires=postgresql@16-main.service
+
+[Service]
+User=garagehub
+Group=garagehub
+EnvironmentFile=/etc/garagehub/postgrest.env
+ExecStart=/usr/local/bin/postgrest
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

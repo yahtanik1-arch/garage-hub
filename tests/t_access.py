@@ -395,7 +395,7 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
             await h.dp.emit_shutdown(bot=h.bot)
             await h.bot.session.close()
 
-    async def test_production_cannot_enable_simulator_or_local_database(self):
+    async def test_production_cannot_enable_simulator(self):
         env = dict(os.environ, APP_ENV="production")
         proc = subprocess.run([sys.executable, "-c", "import core.config"], cwd=ROOT, env=env,
             capture_output=True, text=True)

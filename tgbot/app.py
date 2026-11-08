@@ -8,6 +8,7 @@ from logging.handlers import RotatingFileHandler
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.storage.memory import MemoryStorage, SimpleEventIsolation
@@ -22,7 +23,7 @@ from tgbot import reminders
 from tgbot import texts as t
 from api.server import start_web
 from core.config import (
-    ADMIN_IDS, LOGS_DIR, TELEGRAM_WEBHOOK_SECRET, TELEGRAM_WEBHOOK_URL, TOKEN,
+    ADMIN_IDS, LOGS_DIR, TELEGRAM_WEBHOOK_SECRET, TELEGRAM_WEBHOOK_URL, TELEGRAM_PROXY_URL, TOKEN,
     WEB_PORT, supabase, webapp_url,
 )
 from tgbot.webhook import validate_config
@@ -212,7 +213,8 @@ async def main() -> None:
         log.error("Примените миграции sql/000–003 по README и перезапустите бота.")
         raise RuntimeError("База или её схема недоступна")
 
-    bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(token=TOKEN, session=AiohttpSession(proxy=TELEGRAM_PROXY_URL or None),
+              default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = build_dispatcher()
     tasks = []
     web_runner = None

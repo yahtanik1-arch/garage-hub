@@ -1,6 +1,7 @@
 # Проверенные версии (Python 3.9). Обновлять осознанно и прогонять tests/run_all.py.
 aiogram==3.22.0
 aiohttp==3.12.15
+aiohttp-socks==0.10.2
 httpx==0.28.1
 python-dotenv==1.2.1
 supabase==2.32.0

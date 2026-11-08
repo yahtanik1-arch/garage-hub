@@ -1,6 +1,6 @@
 [Unit]
 Description=GarageHub Telegram webhook and Mini App
-After=network-online.target
+After=network-online.target garagehub-postgrest.service
 Wants=network-online.target
 
 [Service]

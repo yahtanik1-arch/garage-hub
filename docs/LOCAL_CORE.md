@@ -46,8 +46,9 @@ WEB_PORT=8082 python -m tools.local_db web
 доверенного пользователя, его порты нельзя публиковать в сеть.
 
 Команды `web/test/seed/worker` передают дочернему процессу локальные настройки и
-фиктивный токен Telegram. Рабочая `.env` не перезаписывается. Прямое подключение
-PostgREST и имитатор запрещены при `APP_ENV=production`; `MINIAPP_DEV` тоже только локальный.
+фиктивный токен Telegram. Рабочая `.env` не перезаписывается. Имитатор и `MINIAPP_DEV`
+запрещены при `APP_ENV=production`. Свой PostgREST разрешён на loopback; имя `rest`
+для compose-сети разрешено только при `APP_ENV=local`.
 
 ## Проверки и сценарии отказов
 
@@ -139,9 +140,10 @@ Worker использует RPC и ограниченный опрос с пау
 В `deploy/` подготовлены два systemd unit и пример nginx. Пути `/opt/garagehub`,
 пользователь `garagehub`, права на `.env`, каталоги `cache/logs`, домен и сертификат
 настраиваются при T24. На VPS: `APP_ENV=production`, `MINIAPP_DEV=0`,
-`LOCK_PROVIDER=disabled` до реализации проверенного Tuya adapter; `POSTGREST_URL` пуст.
+`LOCK_PROVIDER=disabled` до реализации проверенного Tuya adapter. При Supabase
+`POSTGREST_URL` пуст; при своей PostgreSQL он указывает на приватный loopback PostgREST.
 Worker в этом режиме доставляет outbox и восстанавливает состояния, но не вызывает замки.
-Конфигурации VPS подготовлены; запуск systemd/nginx на реальном сервере не проверен.
+Состояние реального сервера и оставшиеся шаги запуска — в [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Резервное копирование, восстановление и выпуск
 
