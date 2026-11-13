@@ -5,6 +5,9 @@ Telegram-бот [@garazh_rent_bot](https://t.me/garazh_rent_bot) + Mini App вн
 
 Целевая архитектура с Telegram webhook и замками Tuya — [системный дизайн](docs/SYSTEM_DESIGN.md).
 
+Выбранный вариант замка для первого бокса — [TTL M-20T с TTLock G2](docs/TTL_M20T.md):
+простое объяснение подключения, открытия из бота, стоимости и оставшихся проверок.
+
 Ядро доступа уже можно проверить локально: настоящая PostgreSQL, очередь команд,
 worker и имитатор замка, без VPS, Tuya и реального Telegram.
 Запуск и границы проверки — [локальный стенд](docs/LOCAL_CORE.md).
