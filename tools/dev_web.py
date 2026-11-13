@@ -8,6 +8,7 @@ import logging
 import os
 
 os.environ.setdefault("MINIAPP_DEV", "1")
+os.environ.setdefault("APP_ENV", "local")
 
 from aiogram import Bot
 

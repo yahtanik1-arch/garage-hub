@@ -1,0 +1,6 @@
+[Unit]
+Description=GarageHub database backup on the same server
+After=postgresql@16-main.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/garagehub-backup

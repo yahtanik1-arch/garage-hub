@@ -1,0 +1,8 @@
+listen_addresses = '127.0.0.1'
+max_connections = 40
+shared_buffers = '512MB'
+effective_cache_size = '2GB'
+work_mem = '4MB'
+maintenance_work_mem = '128MB'
+max_wal_size = '256MB'
+min_wal_size = '80MB'

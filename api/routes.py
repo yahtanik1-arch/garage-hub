@@ -10,7 +10,7 @@ from typing import Any, Dict
 from aiohttp import web
 
 from core import db
-from core import service
+from core import service, locks
 from tgbot import texts as t
 from api import serializers as ser
 from api.auth import User, authenticate
@@ -18,7 +18,7 @@ from core.utils import at_hour, now, parse_dt
 
 log = logging.getLogger(__name__)
 
-PUBLIC_PREFIXES = ("/api/health", "/api/photo/")
+PUBLIC_PREFIXES = ("/api/health", "/api/ready", "/api/photo/")
 # Каталог открыт без входа — для будущего сайта и поисковиков. Только чтение и только публичные поля
 # (serializers.garage_public без контактов владельца). Брони, «мои заявки» и админка — только со входом.
 PUBLIC_CATALOG = re.compile(r"^/api/garages(/\d+(/availability)?)?$")
@@ -130,6 +130,8 @@ async def body(request: web.Request) -> dict:
 
 def int_param(value, name: str) -> int:
     try:
+        if isinstance(value, bool):
+            raise ValueError()
         return int(value)
     except (TypeError, ValueError):
         raise service.ServiceError("bad_param", f"Некорректное поле «{name}».")
@@ -156,9 +158,18 @@ async def health(request: web.Request) -> web.Response:
     return ok({"ok": True})
 
 
+async def ready(request: web.Request) -> web.Response:
+    try:
+        healthy = await asyncio.wait_for(db.readiness(), timeout=3)
+    except Exception:
+        healthy = False
+    return ok({"ready": healthy}, 200 if healthy else 503)
+
+
 async def me(request: web.Request) -> web.Response:
     u = user_of(request)
-    return ok({"id": u.id, "name": u.name, "username": u.username, "is_admin": u.is_admin, "dev": u.dev})
+    return ok({"id": u.id, "name": u.name, "username": u.username, "is_admin": u.is_admin, "dev": u.dev,
+        "can_operate_locks": u.is_admin and u.id in locks.MANUAL_UNLOCK_ADMIN_IDS})
 
 
 # ─── Каталог ────────────────────────────────────────────────
@@ -210,7 +221,26 @@ async def bookings_create(request: web.Request) -> web.Response:
 async def bookings_mine(request: web.Request) -> web.Response:
     rows = await db.client_bookings(user_of(request).id)
     garages = await db.garages_by_ids(b["garage_id"] for b in rows)
-    return ok({"bookings": [ser.booking_json(b, garages.get(b["garage_id"])) for b in rows]})
+    result = []
+    for b in rows:
+        item = ser.booking_json(b, garages.get(b["garage_id"]))
+        action = await locks.action_for_booking(b["id"], user_of(request).id) if b["status"] == "confirmed" else None
+        item["unlock_action"] = action["id"] if action else None
+        result.append(item)
+    return ok({"bookings": result})
+
+
+async def bookings_unlock(request: web.Request) -> web.Response:
+    if await body(request):
+        raise service.ServiceError("bad_body", "Запрос открытия не принимает дополнительных полей.")
+    c = await locks.request_open(user_of(request).id, int_param(request.match_info["id"], "id"),
+        request.headers.get("Idempotency-Key"), "miniapp")
+    return ok(locks.command_json(c), 202)
+
+
+async def lock_command(request: web.Request) -> web.Response:
+    u = user_of(request)
+    return ok(locks.command_json(await locks.command_for_user(request.match_info["id"], u.id, u.is_admin)))
 
 
 async def bookings_cancel(request: web.Request) -> web.Response:
@@ -279,7 +309,7 @@ async def admin_day(request: web.Request) -> web.Response:
 
 async def admin_confirm(request: web.Request) -> web.Response:
     booking_id = int_param(request.match_info["id"], "id")
-    result = await service.confirm_booking(request.app["bot"], booking_id)
+    result = await service.confirm_booking(request.app["bot"], booking_id, user_of(request).id)
     if not result:
         return await _already_decided(booking_id)
     b, g, delivered = result
@@ -289,7 +319,7 @@ async def admin_confirm(request: web.Request) -> web.Response:
 async def admin_reject(request: web.Request) -> web.Response:
     booking_id = int_param(request.match_info["id"], "id")
     reason = text_field(await body(request), "reason", "Причина", 2, 300)
-    result = await service.reject_booking(request.app["bot"], booking_id, reason)
+    result = await service.reject_booking(request.app["bot"], booking_id, reason, user_of(request).id)
     if not result:
         return await _already_decided(booking_id)
     b, g, delivered = result
@@ -338,9 +368,37 @@ async def admin_lead_done(request: web.Request) -> web.Response:
     return ok({"ok": True})
 
 
+async def admin_locks(request: web.Request) -> web.Response:
+    return ok({"locks": await locks.devices_overview(), "queue": await db.lock_overview(),
+        "can_operate": user_of(request).id in locks.MANUAL_UNLOCK_ADMIN_IDS})
+
+
+async def admin_lock_configure(request: web.Request) -> web.Response:
+    data = await body(request)
+    d = await locks.configure_device(user_of(request).id, int_param(data.get("garage_id"), "garage_id"),
+        data.get("provider"), data.get("provider_device_id"), data.get("enabled"), data.get("reason"))
+    return ok({"lock": d})
+
+
+async def admin_lock_unlock(request: web.Request) -> web.Response:
+    data = await body(request)
+    if set(data) != {"reason"}:
+        raise service.ServiceError("bad_body", "Укажите только причину открытия.")
+    c = await locks.manual_open(user_of(request).id, request.match_info["id"],
+        request.headers.get("Idempotency-Key"), data.get("reason"))
+    return ok(locks.command_json(c), 202)
+
+
+async def admin_lock_resolve(request: web.Request) -> web.Response:
+    data = await body(request)
+    c = await locks.resolve_unknown(user_of(request).id, request.match_info["id"], data.get("state"), data.get("reason"))
+    return ok(locks.command_json(c))
+
+
 def add_routes(app: web.Application) -> None:
     r = app.router
     r.add_get("/api/health", health)
+    r.add_get("/api/ready", ready)
     r.add_get("/api/me", me)
     r.add_get("/api/garages", garages_list)
     r.add_get("/api/garages/{id}", garage_detail)
@@ -348,6 +406,8 @@ def add_routes(app: web.Application) -> None:
     r.add_post("/api/bookings", bookings_create)
     r.add_get("/api/bookings", bookings_mine)
     r.add_post("/api/bookings/{id}/cancel", bookings_cancel)
+    r.add_post("/api/bookings/{id}/unlock", bookings_unlock)
+    r.add_get("/api/lock-commands/{id}", lock_command)
     r.add_post("/api/owner-requests", owner_request)
     r.add_get("/api/admin/summary", admin_summary)
     r.add_get("/api/admin/inbox", admin_inbox)
@@ -359,3 +419,7 @@ def add_routes(app: web.Application) -> None:
     r.add_post("/api/admin/garages/{id}/restore", admin_restore)
     r.add_get("/api/admin/leads", admin_leads)
     r.add_post("/api/admin/leads/{id}/done", admin_lead_done)
+    r.add_get("/api/admin/locks", admin_locks)
+    r.add_post("/api/admin/locks", admin_lock_configure)
+    r.add_post("/api/admin/locks/{id}/unlock", admin_lock_unlock)
+    r.add_post("/api/admin/lock-commands/{id}/resolve", admin_lock_resolve)

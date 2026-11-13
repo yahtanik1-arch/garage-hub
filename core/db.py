@@ -7,7 +7,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional
 
-from core.config import supabase
+from core.config import ADMIN_IDS, supabase
 
 ACTIVE_STATUSES = ["pending", "confirmed"]
 
@@ -105,21 +105,6 @@ async def create_booking(data: dict) -> Optional[dict]:
     return _first(await _run(_bookings().insert(data)))
 
 
-async def change_booking_status(booking_id, new_status: str, allowed_from: Iterable[str],
-                                comment: Optional[str] = None) -> Optional[dict]:
-    """Меняет статус, только если заявка сейчас в одном из allowed_from.
-
-    Возвращает обновлённую заявку или None, если её уже кто-то обработал —
-    так повторное нажатие старой кнопки ничего не испортит.
-    """
-    fields = {"status": new_status}
-    if comment is not None:
-        fields["admin_comment"] = comment
-    return _first(await _run(
-        _bookings().update(fields).eq("id", int(booking_id)).in_("status", list(allowed_from))
-    ))
-
-
 async def mark_booking(booking_id, field: str) -> None:
     await _run(_bookings().update({field: True}).eq("id", int(booking_id)))
 
@@ -195,3 +180,109 @@ async def close_owner_request(request_id) -> Optional[dict]:
     return _first(await _run(
         _owner_requests().update({"status": "done"}).eq("id", int(request_id)).eq("status", "new")
     ))
+
+
+# ─── Доставка событий Telegram ─────────────────────────────
+
+async def telegram_update_processed(bot_id: int, update_id: int) -> bool:
+    return bool(await _run(
+        supabase.table("telegram_updates").select("update_id")
+        .eq("bot_id", bot_id).eq("update_id", update_id).limit(1)
+    ))
+
+
+async def mark_telegram_update_processed(bot_id: int, update_id: int) -> None:
+    await _run(supabase.table("telegram_updates").upsert(
+        {"bot_id": bot_id, "update_id": update_id}, on_conflict="bot_id,update_id",
+    ))
+
+
+# Транзакции выполняются PostgreSQL-функциями, а не серией REST-запросов.
+async def rpc(name: str, **params):
+    return await _run(supabase.rpc(name, params))
+
+
+async def decide_booking(booking_id: int, status: str, actor_id: int, reason=None):
+    return _first(await rpc("gh_booking_decide", p_booking_id=booking_id, p_status=status,
+        p_actor_id=actor_id, p_reason=reason, p_admins=ADMIN_IDS))
+
+
+async def issue_unlock_action(booking_id: int, user_id: int):
+    return _first(await rpc("gh_issue_action", p_booking_id=booking_id, p_user_id=user_id))
+
+
+async def unlock_action(action_id: str, user_id: int):
+    return _first(await _run(supabase.table("unlock_actions").select("*")
+        .eq("id", action_id).eq("user_id", user_id).limit(1)))
+
+
+async def register_unlock(**params):
+    return _first(await rpc("gh_register_unlock", **params))
+
+
+async def lock_command(command_id: str):
+    return _first(await _run(supabase.table("lock_commands").select("*").eq("id", command_id).limit(1)))
+
+
+async def lock_devices():
+    return await _run(supabase.table("lock_devices").select("*").order("garage_id"))
+
+
+async def lock_device(device_id: str):
+    return _first(await _run(supabase.table("lock_devices").select("*").eq("id", device_id).limit(1)))
+
+
+async def device_commands(device_id: str):
+    return await _run(supabase.table("lock_commands").select("*").eq("device_id", device_id)
+                      .order("created_at", desc=True).limit(20))
+
+
+async def set_lock_device(**params):
+    return _first(await rpc("gh_set_device", **params))
+
+
+async def claim_lock_command():
+    return _first(await rpc("gh_claim_command"))
+
+
+async def finish_lock_command(command_id: str, state: str, code: str):
+    return _first(await rpc("gh_finish_command", p_command_id=command_id,
+        p_state=state, p_code=code, p_admins=ADMIN_IDS))
+
+
+async def recover_lock_commands():
+    return await rpc("gh_recover_commands", p_admins=ADMIN_IDS)
+
+
+async def record_device_event(**params):
+    return await rpc("gh_device_event", **params)
+
+
+async def resolve_lock_command(**params):
+    return _first(await rpc("gh_resolve_command", **params))
+
+
+async def claim_notification(booking_id=None):
+    return _first(await rpc("gh_claim_notification", p_booking_id=booking_id))
+
+
+async def finish_notification(row: dict, sent: bool):
+    await rpc("gh_finish_notification", p_id=row["id"], p_attempt=row["attempts"], p_sent=sent)
+
+
+async def readiness():
+    return bool(await rpc("gh_readiness"))
+
+
+async def lock_overview():
+    commands = await _run(supabase.table("lock_commands").select("id,state,created_at,device_id")
+        .in_("state", ["queued", "dispatching", "cloud_accepted", "unknown"]).order("created_at").limit(100))
+    pending = await _run(supabase.table("notification_outbox").select("id,created_at,attempts")
+        .is_("sent_at", "null").order("created_at").limit(100))
+    heartbeats = await _run(supabase.table("service_heartbeats").select("name,seen_at"))
+    return {"commands": commands, "notifications": pending, "heartbeats": heartbeats,
+            "limit": 100}
+
+
+async def worker_tick():
+    await rpc("gh_worker_tick", p_admins=ADMIN_IDS)

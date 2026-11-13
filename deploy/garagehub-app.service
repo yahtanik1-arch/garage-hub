@@ -1,0 +1,25 @@
+[Unit]
+Description=GarageHub Telegram webhook and Mini App
+After=network-online.target garagehub-postgrest.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=garagehub
+Group=garagehub
+WorkingDirectory=/opt/garagehub
+EnvironmentFile=/opt/garagehub/.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/garagehub/venv/bin/python /opt/garagehub/bot.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/garagehub/cache /opt/garagehub/logs
+
+[Install]
+WantedBy=multi-user.target

@@ -11,10 +11,15 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+from local_guard import require_local_database
 SUITES = [
+    ("Telegram через прокси и загрузка фото", "t_telegram_proxy.py"),
+    ("Границы серверной конфигурации", "t_config.py"),
+    ("Telegram webhook (без внешних сервисов)", "t_webhook.py"),
     ("Разбор времени", "t_utils.py"),
     ("API Mini App", "t_api.py"),
     ("Сценарии бота", "t_all.py"),
+    ("Ядро доступа: PostgreSQL, worker, webhook и права", "t_access.py"),
 ]
 
 
@@ -26,6 +31,7 @@ def run(script: str):
 
 
 def main() -> int:
+    require_local_database()
     failed = []
     try:
         for title, script in SUITES:

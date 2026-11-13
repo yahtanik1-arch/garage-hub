@@ -16,7 +16,7 @@ from core.config import webapp_url
 from core.utils import admin_view
 from tgbot.callbacks import (
     AddCb, BookCb, CarouselCb, DayCb, DecideCb, EditCb, EditValCb, LeadCb, MyCb,
-    Noop, ObjCb, OwnerCb, PhotoEditCb, SearchCb,
+    Noop, ObjCb, OwnerCb, PhotoEditCb, SearchCb, UnlockCb,
 )
 
 
@@ -236,13 +236,19 @@ def my_bookings(upcoming: List[tuple]) -> Optional[InlineKeyboardMarkup]:
     return _markup(*rows) if rows else None
 
 
-def my_booking_card(b: dict, g: Optional[dict], can_cancel: bool) -> InlineKeyboardMarkup:
+def my_booking_card(b: dict, g: Optional[dict], can_cancel: bool, action_id=None) -> InlineKeyboardMarkup:
     url = t.map_url(g) if g and b["status"] == "confirmed" else None
     return _markup(
+        [_btn("Открыть бокс", UnlockCb(action="open", value=action_id))] if action_id else None,
         [_url("На карте ↗", url)] if url else None,
         [_btn("Отменить заявку", MyCb(action="cancel", booking_id=b["id"]))] if can_cancel else None,
         [_btn("← Все заявки", MyCb(action="list"))],
     )
+
+
+def lock_command(command_id: str) -> InlineKeyboardMarkup:
+    return _markup([_btn("Проверить результат", UnlockCb(action="status", value=command_id))],
+                   [_btn("Мои заявки", MyCb(action="list"))])
 
 
 def cancel_confirm(booking_id: int) -> InlineKeyboardMarkup:

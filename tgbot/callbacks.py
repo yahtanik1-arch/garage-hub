@@ -85,3 +85,8 @@ class DayCb(CallbackData, prefix="day"):
 class LeadCb(CallbackData, prefix="lead"):
     action: str          # done
     request_id: int
+
+
+class UnlockCb(CallbackData, prefix="lk"):
+    action: str
+    value: str
