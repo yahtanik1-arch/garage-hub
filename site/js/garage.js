@@ -2,7 +2,8 @@ import { html, $, $$ } from "./dom.js";
 import { dayNumber, hhmm, mapUrl, money, SIZES, TOOLS, TYPES, weekdayShort } from "./format.js";
 import { icon } from "./icons.js";
 import * as data from "./data.js";
-import { availabilityLine, boot, bookLink, catalogUrl, errorState, photo, watchImages } from "./ui.js";
+import { bookingForm, wireBooking } from "./booking.js";
+import { availabilityLine, boot, catalogUrl, errorState, photo, watchImages } from "./ui.js";
 
 boot();
 
@@ -63,13 +64,12 @@ function page(g, av) {
         <div class="price-big"><span class="price">${money(g.price)}</span><span class="unit">в час</span></div>
         ${availabilityLine(g)}
         ${week(av)}
-        <a class="btn primary l block" id="book" href="${bookLink(g.id)}" target="_blank" rel="noopener">Забронировать</a>
-        <p class="note">Выберите день и часы в приложении GarageHub. Оплата на месте, напрямую площадке.</p>
+        ${bookingForm(av)}
       </aside>
     </div>
     <div class="cta-bar" id="cta-bar">
       <div><span class="price">${money(g.price)}</span> <span class="unit">в час</span></div>
-      <a class="btn primary" href="${bookLink(g.id)}" target="_blank" rel="noopener">Забронировать</a>
+      <a class="btn primary" href="#booking">Выбрать время</a>
     </div>`;
 }
 
@@ -110,7 +110,8 @@ function lightbox(photos, start) {
   $(".close", box).focus();
 }
 
-function wire(g) {
+function wire(g, av) {
+  wireBooking(root, g, av);
   const photos = g.photos;
   let current = 0;
   const main = $(".photo.main");
@@ -129,9 +130,9 @@ function wire(g) {
 
   // На телефоне цена и кнопка прилипают к низу, когда основная кнопка ушла с экрана
   const bar = $("#cta-bar");
-  if ("IntersectionObserver" in window) {
+  if ("IntersectionObserver" in window && $("#booking")) {
     new IntersectionObserver(([entry]) => bar.classList.toggle("is-on", !entry.isIntersecting && entry.boundingClientRect.top < 0))
-      .observe($("#book"));
+      .observe($("#booking"));
   }
 }
 
@@ -149,7 +150,7 @@ async function main() {
   if (meta) meta.content = `${g.name} в районе ${g.district}. ${money(g.price)} в час. Бронь по часам, оплата на месте.`;
   root.innerHTML = String(page(g, av));
   watchImages(root);
-  wire(g);
+  wire(g, av);
 }
 
 main();

@@ -42,11 +42,13 @@ async def tick(bot: Bot) -> None:
 
     for b in await db.stale_pending(current - timedelta(minutes=CLIENT_WAIT_NOTICE_MIN), "client_wait_notified"):
         await db.mark_booking(b["id"], "client_wait_notified")
-        if parse_dt(b["start_time"]) > current:
+        if b["client_telegram_id"] and parse_dt(b["start_time"]) > current:
             await _send(bot, b["client_telegram_id"], t.wait_notice(b["id"]), kb.my_bookings_link())
 
     for b in await db.visits_starting(current, current + timedelta(minutes=VISIT_REMIND_BEFORE_MIN)):
         await db.mark_booking(b["id"], "visit_reminded")
+        if not b["client_telegram_id"]:
+            continue
         g = await db.garage(b["garage_id"]) or {}
         start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
         await _send(bot, b["client_telegram_id"], t.visit_reminder(g, start, end, current.date()), kb.after_confirm(g))

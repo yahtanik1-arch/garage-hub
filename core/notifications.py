@@ -3,7 +3,7 @@ import logging
 from html import escape
 
 from core import db
-from core.utils import parse_dt
+from core.utils import now, parse_dt
 from tgbot import keyboards as kb, texts as t
 
 log = logging.getLogger(__name__)
@@ -30,6 +30,9 @@ async def render_notification(row):
         return "Заявка больше не найдена.", None
     g = await db.garage(b["garage_id"]) or {}
     start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
+    if kind == "booking_created":
+        return t.admin_booking_card(b, g, start, end, parse_dt(b["created_at"]), now(),
+                                    title="Заявка"), kb.decide(b["id"]) if b["status"] == "pending" else None
     # Отложенное подтверждение не должно утверждать, что уже отменённая бронь действует.
     if kind == "booking_confirmed" and b["status"] == "confirmed":
         return t.confirmed_for_client(b["id"], g, start, end, b["total_price"]), kb.after_confirm(g)
@@ -56,6 +59,8 @@ async def deliver_one(bot, booking_id=None):
 
 
 async def try_booking_notification(bot, booking_id):
+    if bot is None:
+        return False
     try:
         return bool(await deliver_one(bot, booking_id))
     except Exception:

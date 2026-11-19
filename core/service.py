@@ -38,6 +38,8 @@ class ServiceError(Exception):
 async def notify_admins(bot: Bot, text: str, markup=None, **kwargs) -> int:
     """Отправляет сообщение всем админам. Возвращает, скольким дошло (один недоступный не мешает остальным)."""
     delivered = 0
+    if bot is None:
+        return delivered
     for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(admin_id, text, reply_markup=markup, **kwargs)
@@ -106,8 +108,9 @@ def check_hours(g: dict, hours: List[int]) -> List[int]:
     return hours
 
 
-async def create_booking_request(bot: Bot, user_id: int, username: Optional[str],
-                                 garage_id, day: date, hours: List[int]) -> Tuple[dict, dict]:
+async def create_booking_request(bot: Optional[Bot], user_id: Optional[int], username: Optional[str],
+                                 garage_id, day: date, hours: List[int],
+                                 guest: Optional[dict] = None) -> Tuple[dict, dict]:
     """Создаёт заявку pending и отправляет её админу. Возвращает (заявка, объект)."""
     g = await db.garage(garage_id)
     if not g or not g.get("is_active", True):
@@ -116,21 +119,21 @@ async def create_booking_request(bot: Bot, user_id: int, username: Optional[str]
         raise ServiceError("bad_date", "Эта дата недоступна для брони.")
     hours = check_hours(g, hours)
 
-    async with user_lock(user_id):
+    async with user_lock(user_id or (guest or {}).get("web_client_phone")):
         active = [b for b in await db.client_bookings(user_id)
-                  if b["status"] == "pending" and parse_dt(b["end_time"]) > now()]
+                  if b["status"] == "pending" and parse_dt(b["end_time"]) > now()] if user_id else []
         if len(active) >= MAX_ACTIVE_REQUESTS:
             raise ServiceError(
                 "too_many",
                 "У вас уже несколько заявок на согласовании. Дождитесь ответа или отмените лишние.",
             )
         blocked = await blocked_hours(g, day)
-        if any(h in blocked for h in hours):
+        if not guest and any(h in blocked for h in hours):
             raise ServiceError("taken", t.SLOT_TAKEN, 409)
         start, end = at_hour(day, hours[0]), at_hour(day, hours[-1] + 1)
         total = len(hours) * float(g.get("price_per_hour") or 0)
         try:
-            created = await db.create_booking({
+            created = await db.register_booking({
                 "garage_id": g["id"],
                 "client_telegram_id": user_id,
                 "client_username": username,
@@ -138,18 +141,27 @@ async def create_booking_request(bot: Bot, user_id: int, username: Optional[str]
                 "end_time": end.isoformat(),
                 "total_price": total,
                 "status": "pending",
+                **(guest or {}),
             })
         except APIError as error:
             if error.code == "23P01":  # exclusion constraint: гонка двух разных клиентов
                 raise ServiceError("taken", t.SLOT_TAKEN, 409) from None
+            if "idempotency_conflict" in (error.message or ""):
+                raise ServiceError("idempotency_conflict", "Эта заявка уже отправлена с другими данными.", 409) from None
+            if "too_many" in (error.message or ""):
+                raise ServiceError("too_many", "Слишком много активных заявок. Дождитесь подтверждения.", 429) from None
+            if error.code == "22023":
+                raise ServiceError("bad_booking", "Это время недоступно для брони.", 400) from None
+            if error.code == "P0002":
+                raise ServiceError("unavailable", "Площадка сейчас недоступна.", 404) from None
             raise
     if not created:
         raise ServiceError("save_failed", "Не удалось отправить заявку. Попробуйте ещё раз.", 500)
 
-    if not await notify_admins(
-        bot, t.admin_booking_card(created, g, start, end, None, now(), title="Новая заявка"), kb.decide(created["id"]),
-    ):
-        log.error("Заявка №%s создана, но не дошла ни до одного админа", created["id"])
+    if bot is not None:
+        from core.notifications import try_booking_notification
+        for _ in ADMIN_IDS:
+            await try_booking_notification(bot, created["id"])
     return created, g
 
 
@@ -164,7 +176,7 @@ async def confirm_booking(bot: Bot, booking_id: int, actor_id: int):
         return None
     g = await db.garage(b["garage_id"]) or {}
     from core.notifications import try_booking_notification
-    delivered = await try_booking_notification(bot, booking_id)
+    delivered = await try_booking_notification(bot, booking_id) if b["client_telegram_id"] else False
     return b, g, delivered
 
 
@@ -177,7 +189,7 @@ async def reject_booking(bot: Bot, booking_id: int, reason: str, actor_id: int):
         return None
     g = await db.garage(b["garage_id"]) or {}
     from core.notifications import try_booking_notification
-    delivered = await try_booking_notification(bot, booking_id)
+    delivered = await try_booking_notification(bot, booking_id) if b["client_telegram_id"] else False
     return b, g, delivered
 
 

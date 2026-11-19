@@ -109,7 +109,9 @@ async def on_decide(callback: CallbackQuery, callback_data: DecideCb, state: FSM
         b, g, delivered = result
         await answer_quietly(callback, "Подтверждено. Клиент уведомлён." if delivered else "Подтверждено")
         await edit_or_send(callback.message, await booking_card(b, g))
-        if not delivered:
+        if b.get("web_client_phone"):
+            await callback.message.answer("Заявка с сайта. Сообщите решение клиенту по телефону из карточки.")
+        elif not delivered:
             await callback.message.answer("Уведомление сохранено в очереди и будет отправлено повторно.")
         return
 
@@ -148,7 +150,7 @@ async def on_decide(callback: CallbackQuery, callback_data: DecideCb, state: FSM
         if not result:
             await already_decided(callback, bid)
             return
-        await answer_quietly(callback, "Отклонено. Клиент уведомлён." if result[2] else "Отклонено. Уведомление в очереди.")
+        await answer_quietly(callback, "Отклонено. Свяжитесь по телефону." if result[0].get("web_client_phone") else "Отклонено. Клиент уведомлён." if result[2] else "Отклонено. Уведомление в очереди.")
         await edit_or_send(callback.message, await booking_card(result[0], result[1]))
 
 
@@ -162,7 +164,7 @@ async def on_reject_reason(message: Message, state: FSMContext):
     if not result:
         await message.answer("Эта заявка уже обработана.", reply_markup=kb.admin_menu())
         return
-    await message.answer("Заявка отклонена, клиент уведомлён." if result[2] else "Заявка отклонена. Уведомление в очереди.", reply_markup=kb.admin_menu())
+    await message.answer("Заявка отклонена. Сообщите решение клиенту по телефону из карточки." if result[0].get("web_client_phone") else "Заявка отклонена, клиент уведомлён." if result[2] else "Заявка отклонена. Уведомление в очереди.", reply_markup=kb.admin_menu())
     try:
         await message.bot.edit_message_text(
             await booking_card(result[0], result[1]), chat_id=data["chat_id"], message_id=data["message_id"],

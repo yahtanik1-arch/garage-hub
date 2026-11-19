@@ -105,6 +105,11 @@ async def create_booking(data: dict) -> Optional[dict]:
     return _first(await _run(_bookings().insert(data)))
 
 
+async def register_booking(data: dict) -> Optional[dict]:
+    """Заявка и уведомления сохраняются одной транзакцией, без вызовов Telegram."""
+    return _first(await rpc("gh_booking_create", p_data=data, p_admins=ADMIN_IDS))
+
+
 async def mark_booking(booking_id, field: str) -> None:
     await _run(_bookings().update({field: True}).eq("id", int(booking_id)))
 

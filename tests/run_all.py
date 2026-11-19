@@ -18,6 +18,7 @@ SUITES = [
     ("Telegram webhook (без внешних сервисов)", "t_webhook.py"),
     ("Разбор времени", "t_utils.py"),
     ("API Mini App", "t_api.py"),
+    ("Сайт без Telegram и публичные заявки", "t_website.py"),
     ("Сценарии бота", "t_all.py"),
     ("Ядро доступа: PostgreSQL, worker, webhook и права", "t_access.py"),
 ]
