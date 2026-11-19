@@ -64,7 +64,7 @@ function page(g, av) {
         <div class="price-big"><span class="price">${money(g.price)}</span><span class="unit">в час</span></div>
         ${availabilityLine(g)}
         ${week(av)}
-        ${bookingForm(av)}
+        ${bookingForm(av, g.demo_payment)}
       </aside>
     </div>
     <div class="cta-bar" id="cta-bar">

@@ -10,7 +10,7 @@ from aiohttp import web
 
 from api import serializers
 from api.routes import body, int_param, ok, text_field
-from core import service
+from core import db, service
 
 
 def client_hash(request):
@@ -27,13 +27,7 @@ def client_hash(request):
 async def create_booking(request):
     if request.content_type != "application/json":
         raise service.ServiceError("bad_json", "Нужен JSON-запрос.", 415)
-    origin = request.headers.get("Origin")
-    try:
-        same_origin = not origin or (urlsplit(origin).scheme in ("http", "https") and urlsplit(origin).netloc == request.host)
-    except ValueError:
-        same_origin = False
-    if not same_origin:
-        raise service.ServiceError("forbidden", "Отправьте заявку с сайта GarageHub.", 403)
+    check_origin(request)
     try:
         key = UUID(request.headers.get("Idempotency-Key", ""))
         if key.version != 4:
@@ -66,6 +60,46 @@ async def create_booking(request):
             "web_client_name": name, "web_client_phone": "+" + digits,
             "web_request_id": str(key), "web_client_hash": client_hash(request),
         })
+    return ok(booking_result(b, g), 201)
+
+
+def check_origin(request):
+    origin = request.headers.get("Origin")
+    try:
+        same_origin = not origin or (urlsplit(origin).scheme in ("http", "https") and urlsplit(origin).netloc == request.host)
+    except ValueError:
+        same_origin = False
+    if not same_origin:
+        raise service.ServiceError("forbidden", "Отправьте заявку с сайта GarageHub.", 403)
+
+
+def booking_result(b, g):
     result = serializers.booking_json(b, g)
-    result["can_cancel"] = False  # No account or phone verification; changes go through the operator.
-    return ok(result, 201)
+    result["can_cancel"] = False
+    if b.get("demo_payment_token"):
+        # This capability is returned only to its creator or the holder of this random token.
+        result["payment"] = {"mode": "demo", "token": b["demo_payment_token"],
+            "status": b["demo_payment_status"], "expires_at": b["demo_payment_expires_at"]}
+    return result
+
+
+async def demo_payment(request):
+    check_origin(request)
+    try:
+        header = request.headers.get("Authorization", "")
+        if not header.startswith("Demo "):
+            raise ValueError()
+        token = str(UUID(header[5:]))
+    except ValueError:
+        raise service.ServiceError("not_found", "Оплата не найдена.", 404)
+    action = "status"
+    if request.method == "POST":
+        data = await body(request)
+        action = data.get("action")
+        if action not in ("pay", "cancel"):
+            raise service.ServiceError("bad_action", "Неизвестное действие.")
+    rows = await db.rpc("gh_demo_payment", p_token=token, p_action=action)
+    if not rows:
+        raise service.ServiceError("not_found", "Оплата не найдена.", 404)
+    b = rows[0]
+    return ok(booking_result(b, await db.garage(b["garage_id"])))

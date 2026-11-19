@@ -112,6 +112,7 @@ async def create_booking_request(bot: Optional[Bot], user_id: Optional[int], use
                                  garage_id, day: date, hours: List[int],
                                  guest: Optional[dict] = None) -> Tuple[dict, dict]:
     """Создаёт заявку pending и отправляет её админу. Возвращает (заявка, объект)."""
+    await db.rpc("gh_expire_demo_payments")
     g = await db.garage(garage_id)
     if not g or not g.get("is_active", True):
         raise ServiceError("unavailable", "Эта площадка сейчас недоступна.", 404)

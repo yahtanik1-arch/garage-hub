@@ -535,3 +535,9 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
   .door .slats, .door .light { transform: none; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
+
+.payment-dialog { width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid var(--line); border-radius: 20px; padding: 24px; background: var(--bg, white); color: var(--text, #111); }
+.payment-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.payment-dialog p { margin: 14px 0; }
+.payment-dialog .btn { margin-top: 12px; }
+.payment-amount { font-size: 32px; font-weight: 700; }

@@ -23,6 +23,7 @@ def garage_public(g: dict, today: Optional[dict] = None) -> dict:
     open_h, close_h = garage_hours(g)
     data = {
         "id": g["id"],
+        "demo_payment": bool(g.get("demo_payment")),
         "type": g.get("type") or "garage",
         "name": g.get("name") or "",
         "district": pretty(g.get("district")),

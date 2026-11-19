@@ -1,13 +1,14 @@
 import { html, $, $$ } from "./dom.js";
 import { dayLong, hhmm, money } from "./format.js";
 import { DEMO } from "./data.js";
+import { checkout, resumePayment } from "./payment.js";
 
-export function bookingForm(av) {
+export function bookingForm(av, demoPayment = false) {
   if (!av?.days?.length) return html`<p class="note">Расписание сейчас недоступно. Обновите страницу перед бронированием.</p>`;
   return html`
     <form class="booking-form" id="booking" aria-label="Заявка на бронирование">
       <h2 class="h-3">Выберите время</h2>
-      <p class="note">Время московское. Оплата на месте, напрямую площадке.</p>
+      <p class="note">${demoPayment ? "Тестовый бокс: после выбора времени откроется демонстрационная оплата без списания денег." : "Время московское. Оплата на месте, напрямую площадке."}</p>
       <label>Дата<select name="date" required>${av.days.map(d => html`
         <option value="${d.date}" ${d.free ? "" : "disabled"}>${dayLong(d.date)}${d.free ? "" : " — мест нет"}</option>`)}</select></label>
       <div class="booking-times">
@@ -18,9 +19,9 @@ export function bookingForm(av) {
       <label>Ваше имя<input name="name" autocomplete="given-name" required minlength="2" maxlength="80"></label>
       <label>Телефон<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required minlength="10" maxlength="30" placeholder="+7 900 000-00-00"></label>
       <label class="booking-trap" aria-hidden="true">Компания<input name="company" tabindex="-1" autocomplete="off"></label>
-      <label class="booking-consent"><input name="consent" type="checkbox" required><span>Согласен на обработку имени и телефона для этой заявки. Со мной свяжутся для подтверждения.</span></label>
-      <button class="btn primary l block" type="submit" ${DEMO ? "disabled" : ""}>Отправить заявку</button>
-      <p class="booking-result note" role="status" aria-live="polite">${DEMO ? "Режим примеров: заявки не отправляются." : "Бронь действует после подтверждения."}</p>
+      <label class="booking-consent"><input name="consent" type="checkbox" required><span>Согласен на обработку имени и телефона для этой брони.</span></label>
+      <button class="btn primary l block" type="submit" ${DEMO ? "disabled" : ""}>${demoPayment ? "Перейти к тестовой оплате" : "Отправить заявку"}</button>
+      <p class="booking-result note" role="status" aria-live="polite">${DEMO ? "Режим примеров: заявки не отправляются." : demoPayment ? "После успешной тестовой оплаты бронь подтвердится автоматически. На оплату 10 минут." : "Бронь действует после подтверждения."}</p>
     </form>`;
 }
 
@@ -80,6 +81,10 @@ export function wireBooking(root, g, av) {
       });
       const b = await response.json();
       if (!response.ok) throw new Error(b.error?.message || "Не удалось отправить заявку.");
+      if (b.payment?.mode === "demo") {
+        checkout(form, b, reset);
+        return;
+      }
       form.innerHTML = String(html`<div class="booking-result" role="status">
         <h2 class="h-3">Заявка №${b.id} отправлена</h2>
         <p>${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)}</p>
@@ -95,5 +100,11 @@ export function wireBooking(root, g, av) {
       sending = false;
     }
   });
+  function reset() {
+    for (const input of $$('input, select, button', form)) input.disabled = false;
+    sending = false; requestKey = crypto.randomUUID(); total();
+    result.textContent = "Оплата не завершена. Выберите время и попробуйте снова.";
+  }
   starts();
+  if (g.demo_payment && !DEMO) resumePayment(form, g.id, reset);
 }
