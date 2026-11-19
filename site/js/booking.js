@@ -1,6 +1,7 @@
 import { html, $, $$ } from "./dom.js";
 import { dayLong, hhmm, money } from "./format.js";
 import { DEMO } from "./data.js";
+import { wirePhone } from "./phone.js";
 import { checkout, resumePayment } from "./payment.js";
 
 export function bookingForm(av, demoPayment = false) {
@@ -17,7 +18,9 @@ export function bookingForm(av, demoPayment = false) {
       </div>
       <p class="booking-total" aria-live="polite"></p>
       <label>Ваше имя<input name="name" autocomplete="given-name" required minlength="2" maxlength="80"></label>
-      <label>Телефон<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required minlength="10" maxlength="30" placeholder="+7 900 000-00-00"></label>
+      <label>Телефон<span class="phone-control"><span aria-hidden="true">+7-</span><input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" required minlength="13" maxlength="16" pattern="[0-9]{3}-[0-9]{3}-[0-9]{2}-[0-9]{2}" placeholder="777-777-77-77" aria-label="Телефон, код страны +7" aria-describedby="phone-hint phone-error"></span></label>
+      <span class="note" id="phone-hint">Введите 10 цифр номера. +7 уже указан.</span>
+      <span class="phone-error" id="phone-error" role="status" aria-live="polite" hidden></span>
       <label class="booking-trap" aria-hidden="true">Компания<input name="company" tabindex="-1" autocomplete="off"></label>
       <label class="booking-consent"><input name="consent" type="checkbox" required><span>Согласен на обработку имени и телефона для этой брони.</span></label>
       <button class="btn primary l block" type="submit" ${DEMO ? "disabled" : ""}>${demoPayment ? "Перейти к тестовой оплате" : "Отправить заявку"}</button>
@@ -29,6 +32,7 @@ export function wireBooking(root, g, av) {
   const form = $("#booking", root);
   if (!form) return;
   const field = name => form.elements.namedItem(name);
+  const validatePhone = wirePhone(field("phone"), $("#phone-error", form));
   const button = $('button[type="submit"]', form);
   const result = $(".booking-result", form);
   let requestKey = crypto.randomUUID();
@@ -64,12 +68,14 @@ export function wireBooking(root, g, av) {
   form.addEventListener("input", () => { requestKey = crypto.randomUUID(); });
   form.addEventListener("submit", async e => {
     e.preventDefault();
-    if (sending || DEMO || !form.reportValidity()) return;
+    if (sending || DEMO) return;
+    if (!validatePhone()) { field("phone").focus(); return; }
+    if (!form.reportValidity()) return;
     sending = true;
     const payload = {
       garage_id: g.id, date: field("date").value,
       hours: Array.from({ length: Number(field("end").value) - Number(field("start").value) }, (_, i) => Number(field("start").value) + i),
-      name: field("name").value.trim(), phone: field("phone").value,
+      name: field("name").value.trim(), phone: "+7" + field("phone").value.replace(/\D/g, ""),
       consent: field("consent").checked, company: field("company").value,
     };
     for (const input of $$('input, select, button', form)) input.disabled = true;

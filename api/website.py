@@ -38,14 +38,7 @@ async def create_booking(request):
     if data.get("company"):
         raise service.ServiceError("bad_request", "Не удалось отправить заявку.")
     name = text_field(data, "name", "Имя", 2, 80)
-    raw_phone = text_field(data, "phone", "Телефон", 10, 30)
-    if not re.fullmatch(r"[+\d\s()\-]+", raw_phone):
-        raise service.ServiceError("bad_phone", "Укажите телефон с кодом страны.")
-    digits = re.sub(r"\D", "", raw_phone)
-    if len(digits) == 11 and digits.startswith("8"):
-        digits = "7" + digits[1:]
-    if not re.fullmatch(r"[1-9]\d{9,14}", digits):
-        raise service.ServiceError("bad_phone", "Укажите телефон с кодом страны.")
+    phone = russian_phone(data.get("phone"))
     if data.get("consent") is not True:
         raise service.ServiceError("consent_required", "Нужно согласие на обработку контактов для заявки.")
     try:
@@ -57,7 +50,7 @@ async def create_booking(request):
         raise service.ServiceError("bad_hours", "Выберите часы подряд.")
     b, g = await service.create_booking_request(None, None, None,
         int_param(data.get("garage_id"), "garage_id"), day, hours, guest={
-            "web_client_name": name, "web_client_phone": "+" + digits,
+            "web_client_name": name, "web_client_phone": phone,
             "web_request_id": str(key), "web_client_hash": client_hash(request),
         })
     return ok(booking_result(b, g), 201)
@@ -103,3 +96,20 @@ async def demo_payment(request):
         raise service.ServiceError("not_found", "Оплата не найдена.", 404)
     b = rows[0]
     return ok(booking_result(b, await db.garage(b["garage_id"])))
+
+
+def russian_phone(value):
+    message = "Введите российский номер: +7 и ровно 10 цифр."
+    if not isinstance(value, str) or not 10 <= len(value.strip()) <= 24:
+        raise service.ServiceError("bad_phone", message)
+    raw = value.strip()
+    if not re.fullmatch(r"\+?[0-9\s()\-]+", raw):
+        raise service.ServiceError("bad_phone", message)
+    digits = re.sub(r"\D", "", raw)
+    if raw.startswith("+") and not (len(digits) == 11 and digits.startswith("7")):
+        raise service.ServiceError("bad_phone", message)
+    if len(digits) == 11 and digits[0] in "78":
+        digits = digits[1:]
+    if len(digits) != 10:
+        raise service.ServiceError("bad_phone", message)
+    return "+7" + digits
