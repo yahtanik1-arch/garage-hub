@@ -547,4 +547,9 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 .phone-control:focus-within { outline: 2px solid var(--link); outline-offset: 2px; }
 .phone-control input:focus { outline: none; }
 .phone-error { color: #b42318; font-size: 14px; }
-.phone-error[hidden] { display: none; }
+/* Reserve the same feedback space on blur: controls below must not move during a click. */
+.phone-feedback { display: grid; min-height: 3em; font-size: 14px; line-height: 1.5; }
+.phone-feedback > * { grid-area: 1 / 1; }
+.phone-feedback .phone-error[hidden] { display: block; visibility: hidden; }
+.booking-form .booking-consent { min-height: 44px; padding-block: 8px; cursor: pointer; }
+.booking-consent input { width: 20px; height: 20px; cursor: pointer; }

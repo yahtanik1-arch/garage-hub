@@ -23,6 +23,8 @@ export function wirePhone(input, error) {
     input.setAttribute("aria-invalid", String(Boolean(text)));
     error.textContent = text;
     error.hidden = !text;
+    const hint = input.form.querySelector("#phone-hint");
+    if (hint) hint.style.visibility = text ? "hidden" : "";
   }
   function caret(count) {
     if (!count) return 0;
@@ -43,12 +45,17 @@ export function wirePhone(input, error) {
     if (e.inputType === "insertText" && /^\d$/.test(e.data || "")) {
       const selected = input.value.slice(input.selectionStart, input.selectionEnd).replace(/\D/g, "").length;
       if (digits().length - selected >= 10) {
-        e.preventDefault(); message("Номер уже заполнен: после +7 только 10 цифр.");
+        e.preventDefault(); // The field is full; ignoring a key does not invalidate the existing number.
       }
     }
   });
-  input.addEventListener("input", () => {
+  input.addEventListener("input", e => {
     const raw = input.value;
+    // Some mobile keyboards deliver input without a cancellable beforeinput.
+    if (/^[0-9]$/.test(e.data || "") && previous.replace(/\D/g, "").length === 10 && raw.replace(/\D/g, "").length > 10) {
+      input.value = previous;
+      return;
+    }
     const before = raw.slice(0, input.selectionStart).replace(/\D/g, "").length;
     try {
       const value = parsePhone(raw);
@@ -87,7 +94,7 @@ export function wirePhone(input, error) {
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   function validate() {
-    // Keep a paste/overflow error until the user edits the number.
+    // Keep a rejected paste error until the user edits the number.
     if (input.validationMessage && input.getAttribute("aria-invalid") === "true") return false;
     const valid = digits().length === 10;
     message(valid ? "" : "Введите номер полностью: 10 цифр после +7.");

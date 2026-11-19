@@ -19,8 +19,10 @@ export function bookingForm(av, demoPayment = false) {
       <p class="booking-total" aria-live="polite"></p>
       <label>Ваше имя<input name="name" autocomplete="given-name" required minlength="2" maxlength="80"></label>
       <label>Телефон<span class="phone-control"><span aria-hidden="true">+7-</span><input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" required minlength="13" maxlength="16" pattern="[0-9]{3}-[0-9]{3}-[0-9]{2}-[0-9]{2}" placeholder="777-777-77-77" aria-label="Телефон, код страны +7" aria-describedby="phone-hint phone-error"></span></label>
-      <span class="note" id="phone-hint">Введите 10 цифр номера. +7 уже указан.</span>
-      <span class="phone-error" id="phone-error" role="status" aria-live="polite" hidden></span>
+      <span class="phone-feedback">
+        <span class="note" id="phone-hint">Введите 10 цифр номера. +7 уже указан.</span>
+        <span class="phone-error" id="phone-error" role="status" aria-live="polite" hidden></span>
+      </span>
       <label class="booking-trap" aria-hidden="true">Компания<input name="company" tabindex="-1" autocomplete="off"></label>
       <label class="booking-consent"><input name="consent" type="checkbox" required><span>Согласен на обработку имени и телефона для этой брони.</span></label>
       <button class="btn primary l block" type="submit" ${DEMO ? "disabled" : ""}>${demoPayment ? "Перейти к тестовой оплате" : "Отправить заявку"}</button>
