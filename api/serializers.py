@@ -23,6 +23,7 @@ def garage_public(g: dict, today: Optional[dict] = None) -> dict:
     open_h, close_h = garage_hours(g)
     data = {
         "id": g["id"],
+        "demo_payment": bool(g.get("demo_payment")),
         "type": g.get("type") or "garage",
         "name": g.get("name") or "",
         "district": pretty(g.get("district")),
@@ -99,6 +100,8 @@ def booking_admin(b: dict, g: Optional[dict]) -> dict:
     data.update({
         "client_id": b["client_telegram_id"],
         "client_username": b.get("client_username") or "",
+        "client_name": b.get("web_client_name") or "",
+        "client_phone": b.get("web_client_phone") or "",
         "minutes_ago": int((now() - created).total_seconds() // 60) if created else None,
         "owner_name": g.get("owner_name") or "",
         "owner_phone": g.get("owner_phone") or "",

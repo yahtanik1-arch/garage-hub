@@ -13,11 +13,15 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 from local_guard import require_local_database
 SUITES = [
+    ("Российские номера телефона", "t_phone.py"),
+    ("Фотографии с сервера без Telegram", "t_local_photos.py"),
     ("Telegram через прокси и загрузка фото", "t_telegram_proxy.py"),
     ("Границы серверной конфигурации", "t_config.py"),
     ("Telegram webhook (без внешних сервисов)", "t_webhook.py"),
     ("Разбор времени", "t_utils.py"),
     ("API Mini App", "t_api.py"),
+    ("Сайт без Telegram и публичные заявки", "t_website.py"),
+    ("Демонстрационная оплата и автоподтверждение", "t_demo_payments.py"),
     ("Сценарии бота", "t_all.py"),
     ("Ядро доступа: PostgreSQL, worker, webhook и права", "t_access.py"),
 ]

@@ -11,7 +11,7 @@ from supabase import ClientOptions, create_client
 BASE_DIR = Path(__file__).resolve().parent.parent   # корень проекта (config.py лежит в core/)
 load_dotenv(BASE_DIR / ".env")
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_PROXY_URL = os.getenv("TELEGRAM_PROXY_URL", "").strip()
 if TELEGRAM_PROXY_URL:
     try:
@@ -51,8 +51,6 @@ ADMIN_IDS = [ADMIN_ID] + [x for x in EXTRA_ADMIN_IDS if x != ADMIN_ID]
 ADMIN_TG = os.getenv("ADMIN_TG", "")
 ADMIN_PHONE = os.getenv("ADMIN_PHONE", "")
 
-if not TOKEN:
-    raise RuntimeError("TELEGRAM_BOT_TOKEN не найден в .env")
 if not SUPABASE_URL and not POSTGREST_URL:
     raise RuntimeError("SUPABASE_URL не найден в .env")
 if not SUPABASE_KEY:

@@ -378,7 +378,7 @@ button { background: none; border: 0; padding: 0; cursor: pointer; }
 .thumbs button[aria-current="true"], .thumbs button:hover { opacity: 1; }
 .thumbs img { width: 100%; height: 100%; object-fit: cover; }
 
-.panel { position: sticky; top: calc(var(--header-h) + 16px); }
+.panel { position: static; }
 .panel .type { color: var(--text-2); font-weight: 600; font-size: var(--fs-15); }
 .panel h1 { margin-top: 6px; }
 .panel .where { margin-top: 8px; color: var(--text-2); }
@@ -394,6 +394,17 @@ button { background: none; border: 0; padding: 0; cursor: pointer; }
 .week .day em { display: block; margin-top: 4px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--success); font-variant-numeric: tabular-nums; }
 .week .day.full em { color: var(--text-3); font-weight: 500; }
 .week-caption { margin-top: 8px; font-size: var(--fs-13); color: var(--text-2); }
+
+.booking-form { display: grid; gap: 14px; margin-top: 24px; scroll-margin-top: 96px; }
+.booking-form label { display: grid; gap: 6px; font-size: var(--fs-15); }
+.booking-form input:not([type=checkbox]), .booking-form select { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.booking-times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.booking-form .booking-consent { grid-template-columns: 20px 1fr; align-items: start; font-size: var(--fs-13); }
+.booking-consent input { margin-top: 3px; }
+.booking-form .booking-trap { display: none; }
+.booking-total { font-weight: 600; }
+.booking-result p + p { margin-top: 10px; }
+.booking-form .btn, .booking-form .note { margin-top: 0; }
 
 .props { border-top: 1px solid var(--line); }
 .props div { display: grid; grid-template-columns: minmax(140px, 0.4fr) 1fr; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
@@ -524,3 +535,21 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
   .door .slats, .door .light { transform: none; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
+
+.payment-dialog { width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid var(--line); border-radius: 20px; padding: 24px; background: var(--bg, white); color: var(--text, #111); }
+.payment-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.payment-dialog p { margin: 14px 0; }
+.payment-dialog .btn { margin-top: 12px; }
+.payment-amount { font-size: 32px; font-weight: 700; }
+
+.phone-control { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding-left: 12px; background: var(--bg); }
+.booking-form .phone-control input { border: 0; border-radius: 12px; padding-left: 0; flex: 1; }
+.phone-control:focus-within { outline: 2px solid var(--link); outline-offset: 2px; }
+.phone-control input:focus { outline: none; }
+.phone-error { color: #b42318; font-size: 14px; }
+/* Reserve the same feedback space on blur: controls below must not move during a click. */
+.phone-feedback { display: grid; min-height: 3em; font-size: 14px; line-height: 1.5; }
+.phone-feedback > * { grid-area: 1 / 1; }
+.phone-feedback .phone-error[hidden] { display: block; visibility: hidden; }
+.booking-form .booking-consent { min-height: 44px; padding-block: 8px; cursor: pointer; }
+.booking-consent input { width: 20px; height: 20px; cursor: pointer; }

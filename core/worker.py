@@ -71,6 +71,8 @@ class Worker:
 
 
 async def main(scenario="success"):
+    if not TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN не найден в .env")
     adapter = None
     if LOCK_PROVIDER == "simulator":
         from core.lock_simulator import LockSimulator

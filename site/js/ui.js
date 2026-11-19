@@ -5,8 +5,7 @@ import { placeholderArt } from "./icons.js";
 import { DEMO } from "./data.js";
 
 export const BOT = "garazh_rent_bot";
-/* Бронь оформляется в приложении GarageHub внутри мессенджера: сразу открывается нужный бокс */
-export const bookLink = (id) => `https://t.me/${BOT}?startapp=g${id}`;
+/* Заявка оформляется прямо на сайте, Telegram не требуется. */
 export const appLink = `https://t.me/${BOT}`;
 /* В режиме примеров номер дублируется в #, чтобы превью открывалось и там, где адрес страницы обрезают */
 export const garageUrl = (id) => `garage.html?id=${encodeURIComponent(id)}${DEMO ? `&demo#${encodeURIComponent(id)}` : ""}`;

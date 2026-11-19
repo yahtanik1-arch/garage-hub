@@ -26,7 +26,10 @@ PUBLIC_CATALOG = re.compile(r"^/api/garages(/\d+(/availability)?)?$")
 
 def is_public(request: web.Request) -> bool:
     path = request.path
-    return path.startswith(PUBLIC_PREFIXES) or (request.method == "GET" and bool(PUBLIC_CATALOG.match(path)))
+    return (path.startswith(PUBLIC_PREFIXES)
+            or (request.method == "GET" and bool(PUBLIC_CATALOG.match(path)))
+            or (request.method == "POST" and path == "/api/public/bookings")
+            or (request.method in ("GET", "POST") and path == "/api/public/demo-payment"))
 
 
 def dumps(data) -> str:
@@ -396,7 +399,11 @@ async def admin_lock_resolve(request: web.Request) -> web.Response:
 
 
 def add_routes(app: web.Application) -> None:
+    from api.website import create_booking, demo_payment
     r = app.router
+    r.add_post("/api/public/bookings", create_booking)
+    r.add_get("/api/public/demo-payment", demo_payment)
+    r.add_post("/api/public/demo-payment", demo_payment)
     r.add_get("/api/health", health)
     r.add_get("/api/ready", ready)
     r.add_get("/api/me", me)

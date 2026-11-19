@@ -76,6 +76,7 @@ async def booking(booking_id) -> Optional[dict]:
 
 async def busy_bookings(garage_id, start: datetime, end: datetime) -> List[dict]:
     """Активные брони объекта, пересекающие интервал [start, end)."""
+    await rpc("gh_expire_demo_payments", p_garage_id=int(garage_id))
     return await _run(
         _bookings()
         .select("start_time, end_time")
@@ -91,6 +92,7 @@ async def busy_for_garages(ids: Iterable, start: datetime, end: datetime) -> Lis
     ids = sorted({int(i) for i in ids})
     if not ids:
         return []
+    await rpc("gh_expire_demo_payments")
     return await _run(
         _bookings()
         .select("garage_id, start_time, end_time")
@@ -103,6 +105,11 @@ async def busy_for_garages(ids: Iterable, start: datetime, end: datetime) -> Lis
 
 async def create_booking(data: dict) -> Optional[dict]:
     return _first(await _run(_bookings().insert(data)))
+
+
+async def register_booking(data: dict) -> Optional[dict]:
+    """Заявка и уведомления сохраняются одной транзакцией, без вызовов Telegram."""
+    return _first(await rpc("gh_booking_create", p_data=data, p_admins=ADMIN_IDS))
 
 
 async def mark_booking(booking_id, field: str) -> None:

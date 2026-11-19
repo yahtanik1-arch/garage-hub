@@ -1,0 +1,26 @@
+[Unit]
+Description=GarageHub website and API (independent of Telegram)
+After=network-online.target garagehub-postgrest.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=garagehub
+Group=garagehub
+WorkingDirectory=/opt/garagehub
+EnvironmentFile=/opt/garagehub/.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=WEB_PORT=8080
+ExecStart=/opt/garagehub/venv/bin/python -m api
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/garagehub/cache /opt/garagehub/logs
+
+[Install]
+WantedBy=multi-user.target
