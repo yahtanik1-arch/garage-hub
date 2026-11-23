@@ -1,5 +1,6 @@
 import {html, $} from "./dom.js";
 import {dayLong, hhmm, money, mapUrl} from "./format.js";
+import {icon} from "./icons.js";
 import {privateBookingUrl, rememberBooking} from "./bookings-store.js";
 
 export function statusText(b) {
@@ -9,29 +10,33 @@ export function statusText(b) {
   return b.payment?.status === "awaiting" ? "Ожидает оплаты" : "Ожидает подтверждения";
 }
 
-export function bookingDetails(b) {
+export function bookingDetails(b, {canForget = false} = {}) {
   const paid = b.payment?.status === "paid";
+  const confirmed = b.status === "confirmed" && !b.is_past;
+  const stateIcon = confirmed ? "check" : b.status === "pending" ? "clock" : "info";
   return html`<div class="booking-details">
-    <p class="booking-badge">${statusText(b)}</p>
-    <h2 class="h-3">${b.garage.name}</h2>
-    <p>${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)} · московское время</p>
-    <p>${paid ? "Тестовая оплата" : "Стоимость"}: <strong>${money(b.total)}</strong>${paid ? ". Деньги не списывались." : ""}</p>
-    ${b.is_demo ? html`<p class="booking-notice">Демонстрационный бокс: физической площадки нет. Приезжать и платить не нужно.</p>` : ""}
-    ${b.comment ? html`<p>Причина отказа: ${b.comment}</p>` : ""}
-    <section><h3 class="h-3">Адрес</h3><p>${b.garage.address || "Адрес пока не указан"}</p>
-      ${b.arrival?.can_show_route ? html`<a class="btn secondary" href="${mapUrl(b.garage)}" target="_blank" rel="noopener noreferrer">Построить маршрут</a>` : ""}
-    </section>
-    <section><h3 class="h-3">Как попасть в бокс</h3>
-      <p class="arrival-instructions">${b.arrival?.instructions || (b.is_past ? "Бронирование завершено." : b.status === "pending" ? "Инструкция будет доступна после подтверждения брони." : "Эта бронь не даёт права на вход.")}</p>
-    </section>
-    <section><h3 class="h-3">Поддержка</h3><p>${b.support?.message || "Поддержка скоро появится"}</p></section>
-    ${b.access_token ? html`<section class="private-booking"><h3 class="h-3">Сохранить бронь</h3>
-      <p>В «Моих бронированиях» на этом устройстве или по личной ссылке на другом. Ссылка даёт доступ к этой брони — не публикуйте её.</p>
+    <div class="booking-overview">
+      <span class="booking-status ${confirmed ? "is-confirmed" : ""}">${icon(stateIcon)}${statusText(b)}</span>
+      <h2 class="booking-title">${b.garage.name}</h2>
+      <div class="booking-schedule"><span>${icon("calendar")}${dayLong(b.date)}</span><span>${icon("clock")}${hhmm(b.start_hour)}–${hhmm(b.end_hour)}</span></div>
+      <p class="booking-timezone">Время московское</p>
+      <div class="booking-total-row"><div><span>${paid ? "Тестовая оплата" : "Стоимость брони"}</span>
+        ${paid ? html`<p>Деньги не списывались</p>` : ""}</div><strong>${money(b.total)}</strong></div>
+    </div>
+    ${b.is_demo ? html`<div class="booking-demo-note">${icon("info")}<div><strong>Демонстрационная бронь</strong><p>Это тестовый бокс. Приезжать никуда не нужно.</p></div></div>` : html`
+      <section class="booking-info-row">${icon("pin")}<div><h3>Адрес</h3><p>${b.garage.address || "Адрес пока не указан"}</p>
+        ${b.arrival?.can_show_route ? html`<a class="booking-route" href="${mapUrl(b.garage)}" target="_blank" rel="noopener noreferrer">${icon("route")}Построить маршрут</a>` : ""}</div></section>
+      <section class="booking-info-row">${icon("garage")}<div><h3>Как попасть в бокс</h3>
+        <p class="arrival-instructions">${b.arrival?.instructions || (b.is_past ? "Бронирование завершено." : b.status === "pending" ? "Инструкция будет доступна после подтверждения брони." : "Эта бронь не даёт права на вход.")}</p></div></section>`}
+    ${b.comment ? html`<div class="booking-demo-note">${icon("info")}<div><strong>Причина отказа</strong><p>${b.comment}</p></div></div>` : ""}
+    <section class="booking-info-row booking-support">${icon("phone")}<div><h3>Поддержка</h3><p>${b.support?.message || "Поддержка скоро появится"}</p></div></section>
+    ${b.access_token ? html`<details class="private-booking"><summary>${icon("share")}<span><strong>Личная ссылка на бронь</strong><small>Для другого устройства</small></span>${icon("down")}</summary><div class="private-booking-body">
+      <p>Личная ссылка откроет эту бронь на другом устройстве. Не публикуйте её.</p>
       <label class="private-link">Личная ссылка<input readonly type="text" value="${privateBookingUrl(b.access_token)}" aria-label="Личная ссылка на бронь" autocomplete="off" spellcheck="false"></label>
-      <button type="button" class="btn secondary" data-copy-booking>Скопировать ссылку</button>
+      <button type="button" class="btn secondary" data-copy-booking>${icon("share")}Скопировать ссылку</button>
       <p class="copy-result note" role="status" aria-live="polite"></p>
-      <a href="bookings.html" class="btn secondary">Мои бронирования</a>
-    </section>` : ""}
+      ${canForget ? html`<div class="forget-booking"><button class="btn" type="button" data-dialog-forget>Убрать с этого устройства</button><p class="note">Удаляет сохранённую ссылку, но не отменяет бронь.</p></div>` : ""}
+    </div></details>` : ""}
   </div>`;
 }
 
@@ -39,6 +44,8 @@ export function wireBookingDetails(root, b) {
   if (b.access_token && !rememberBooking(b)) {
     const result = $(".copy-result", root);
     if (result) result.textContent = "Не удалось сохранить бронь в браузере. Скопируйте личную ссылку, чтобы вернуться к ней.";
+    const details = $(".private-booking", root);
+    if (details) details.open = true;
   }
   const button = $("[data-copy-booking]", root);
   if (!button) return;
@@ -54,19 +61,34 @@ export function openBookingDialog(b, {onResume, onForget, returnFocus} = {}) {
   const dialog = document.createElement("dialog");
   dialog.className = "booking-dialog";
   dialog.setAttribute("aria-labelledby", "booking-dialog-title");
+  const resumable = onResume && b.status === "pending" && b.payment?.status === "awaiting";
   dialog.innerHTML = String(html`<header class="booking-dialog-header">
-    <h2 class="h-3" id="booking-dialog-title">Бронь №${b.id}</h2>
-    <button type="button" class="booking-dialog-close" aria-label="Закрыть информацию о брони">×</button>
-    </header><div class="booking-dialog-content">${bookingDetails(b)}
-    ${onResume && b.status === "pending" && b.payment?.status === "awaiting" ? html`<button class="btn primary" type="button" data-dialog-resume>Продолжить тестовую оплату</button>` : ""}
-    ${onForget ? html`<button class="btn" type="button" data-dialog-forget>Убрать с этого устройства</button><p class="note">Убирает сохранённую ссылку из этого браузера. Саму бронь не отменяет.</p>` : ""}
-    </div>`);
+    <h2 id="booking-dialog-title">Бронь №${b.id}</h2>
+    <button type="button" class="booking-dialog-close" aria-label="Закрыть информацию о брони">${icon("x")}</button>
+    </header><div class="booking-dialog-content">${bookingDetails(b, {canForget: Boolean(onForget)})}</div>
+    <footer class="booking-dialog-footer">
+      ${!onForget && b.access_token ? html`<a href="bookings.html" class="btn secondary">Мои бронирования</a>` : ""}
+      ${resumable ? html`<button class="btn primary" type="button" data-dialog-resume>Продолжить оплату</button>` : html`<button class="btn primary" type="button" data-dialog-done>Готово</button>`}
+    </footer>`);
   const previous = returnFocus || document.activeElement;
+  let closing = false;
+  const close = callback => {
+    if (closing) return;
+    closing = true;
+    dialog.classList.add("is-closing");
+    const animations = dialog.getAnimations ? dialog.getAnimations() : [];
+    Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+      dialog.close();
+      if (callback) callback();
+    });
+  };
   dialog.addEventListener("close", () => { dialog.remove(); if (previous?.isConnected) previous.focus(); }, {once: true});
-  $(".booking-dialog-close", dialog).onclick = () => dialog.close();
-  const resume = $("[data-dialog-resume]", dialog), forget = $("[data-dialog-forget]", dialog);
-  if (resume) resume.onclick = () => { dialog.close(); onResume(b); };
-  if (forget) forget.onclick = () => { dialog.close(); onForget(b); };
+  dialog.addEventListener("cancel", e => { e.preventDefault(); close(); });
+  $(".booking-dialog-close", dialog).onclick = () => close();
+  const done = $("[data-dialog-done]", dialog), resume = $("[data-dialog-resume]", dialog), forget = $("[data-dialog-forget]", dialog);
+  if (done) done.onclick = () => close();
+  if (resume) resume.onclick = () => close(() => onResume(b));
+  if (forget) forget.onclick = () => close(() => onForget(b));
   document.body.append(dialog);
   wireBookingDetails(dialog, b);
   dialog.showModal();
