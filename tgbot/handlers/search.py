@@ -205,7 +205,7 @@ async def on_carousel(callback: CallbackQuery, callback_data: CarouselCb, state:
         await answer_quietly(callback)
         photos = (g.get("photos") or [])[:5]
         if len(photos) > 1:
-            await callback.message.answer_media_group([InputMediaPhoto(media=p) for p in photos])
+            await callback.message.answer_media_group([InputMediaPhoto(media=media.photo(p)) for p in photos])
         return
 
     await answer_quietly(callback)

@@ -419,8 +419,10 @@ async def on_photos(callback: CallbackQuery, callback_data: PhotoEditCb, state: 
         await answer_quietly(callback)
         await reset(state)
         await edit_or_send(callback.message, t.photos_edit_intro(len(current)), kb.photos_edit(gid, bool(current)))
-        if current:
-            await callback.message.answer_media_group([InputMediaPhoto(media=p) for p in current[:MAX_PHOTOS]])
+        if len(current) == 1:
+            await callback.message.answer_photo(photo=media.photo(current[0]))
+        elif current:
+            await callback.message.answer_media_group([InputMediaPhoto(media=media.photo(p)) for p in current[:MAX_PHOTOS]])
         return
 
     if action in ("add", "replace"):

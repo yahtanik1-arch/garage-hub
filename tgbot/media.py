@@ -1,5 +1,6 @@
 """Фирменные картинки. После первой загрузки Telegram отдаёт file_id — дальше шлём его,
 чтобы не загружать файл заново."""
+import re
 from typing import Dict, Optional, Union
 
 from aiogram.types import FSInputFile, Message
@@ -18,9 +19,20 @@ def remember(name: str, message: Optional[Message]) -> None:
         _file_ids[name] = message.photo[-1].file_id
 
 
+def photo(source: str) -> Union[str, FSInputFile]:
+    if not source.startswith("local:"):
+        return source
+    name = source[6:]
+    if re.fullmatch(r"[A-Za-z0-9_-]+\.(?:jpg|png|webp)", name):
+        path = ASSETS_DIR / "garages" / name
+        if path.is_file():
+            return FSInputFile(path)
+    return image("placeholder")
+
+
 def garage_photo(g: dict) -> Union[str, FSInputFile]:
     photos = g.get("photos") or []
-    return photos[0] if photos else image("placeholder")
+    return photo(photos[0]) if photos else image("placeholder")
 
 
 def uses_placeholder(g: dict) -> bool:
