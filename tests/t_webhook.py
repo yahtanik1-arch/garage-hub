@@ -281,6 +281,20 @@ class RealHandlerTests(unittest.IsolatedAsyncioTestCase):
                 await h.bot.session.close()
 
 
+class SchemaTests(unittest.TestCase):
+    def test_readiness_with_standalone_postgrest_client(self):
+        import httpx
+        from postgrest import SyncPostgrestClient
+
+        def respond(request):
+            return httpx.Response(200, json=True if request.url.path == "/rpc/gh_readiness" else [])
+
+        with httpx.Client(transport=httpx.MockTransport(respond)) as transport:
+            client = SyncPostgrestClient("http://127.0.0.1:3000", http_client=transport)
+            with patch.object(app, "supabase", client):
+                self.assertTrue(app.check_schema())
+
+
 class StartupTests(unittest.IsolatedAsyncioTestCase):
     async def run_mode(self, url, secret, bind_error=False, proxy=""):
         self.bot = SimpleNamespace(
