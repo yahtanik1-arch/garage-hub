@@ -556,6 +556,7 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 
 .bookings-page { max-width: 960px; padding-top: 40px; padding-bottom: 64px; }
 .bookings-intro { margin: 16px 0 24px; color: var(--text-2); }
+.bookings-page [data-refresh-bookings] { margin-top: 24px; }
 .import-booking { margin-bottom: 32px; }
 .import-booking label { display: block; font-weight: 600; margin-bottom: 8px; }
 .import-booking > div { display: flex; gap: 8px; }
