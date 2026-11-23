@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from aiohttp import web
+from postgrest.exceptions import APIError
 
 from api import serializers
 from api.routes import body, int_param, ok, text_field
@@ -73,6 +74,7 @@ def booking_result(b, g):
     if b.get("client_telegram_id") is None and b.get("web_booking_token"):
         result["access_token"] = b["web_booking_token"]
         result["is_past"] = parse_dt(b["end_time"]) <= now()
+        result["can_cancel"] = b["status"] in ("pending", "confirmed") and parse_dt(b["start_time"]) > now()
         demo = bool(b.get("demo_payment_token") or (g and g.get("demo_payment")))
         result["is_demo"] = demo
         if b["status"] == "confirmed" and not result["is_past"]:
@@ -145,3 +147,28 @@ async def my_bookings(request):
     rows = await db.website_bookings(tokens)
     garages = await db.garages_by_ids(b["garage_id"] for b in rows)
     return ok({"bookings": [booking_result(b, garages.get(b["garage_id"])) for b in rows]})
+
+
+async def cancel_booking(request):
+    check_origin(request)
+    if request.content_type != "application/json":
+        raise service.ServiceError("bad_json", "Нужен JSON-запрос.", 415)
+    try:
+        header = request.headers.get("Authorization", "")
+        if not header.startswith("Booking "):
+            raise ValueError()
+        token = str(UUID(header[8:]))
+    except ValueError:
+        raise service.ServiceError("not_found", "Бронь не найдена.", 404)
+    data = await body(request)
+    if data.get("confirm") is not True:
+        raise service.ServiceError("confirmation_required", "Подтвердите отмену брони.")
+    try:
+        b = await db.cancel_website_booking(token)
+    except APIError as error:
+        if error.code == "55000":
+            raise service.ServiceError("cancellation_closed", "Бронирование уже началось или не допускает отмену.", 409) from None
+        raise
+    if not b:
+        raise service.ServiceError("not_found", "Бронь не найдена.", 404)
+    return ok(booking_result(b, await db.garage(b["garage_id"])))

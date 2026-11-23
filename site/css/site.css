@@ -658,3 +658,18 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 
 .booking-confirmation-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .booking-result > p { margin-top: 12px; }
+
+button.my-booking-row { width: 100%; text-align: left; }
+.booking-row-action { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; color: var(--text-2); font-size: 14px; }
+.booking-row-action > span { font-size: 24px; line-height: 1; }
+.my-booking-row:hover .booking-row-action { color: var(--text); }
+.booking-cancel-button { color: #b42318; }
+.btn.danger { color: white; background: #b42318; }
+.btn.danger:hover { background: #912018; }
+.booking-cancel-info { padding: 8px 0 24px; }
+.booking-cancel-info p { margin-top: 16px; }
+.booking-cancel-info .note { color: var(--text-2); font-size: 13px; }
+.cancel-error { color: #b42318; font-size: 14px; }
+.cancel-error:empty { display: none; }
+.booking-cancel-success { margin: 8px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--fill); font-size: 14px; }
+@media (prefers-color-scheme: dark) { .booking-cancel-button, .cancel-error { color: #ff9b91; } }

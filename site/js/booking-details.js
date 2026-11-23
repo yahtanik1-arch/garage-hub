@@ -1,7 +1,7 @@
 import {html, $} from "./dom.js";
 import {dayLong, hhmm, money, mapUrl} from "./format.js";
 import {icon} from "./icons.js";
-import {privateBookingUrl, rememberBooking} from "./bookings-store.js";
+import {privateBookingUrl, rememberBooking, cancelBooking} from "./bookings-store.js";
 
 export function statusText(b) {
   if (b.status === "confirmed") return b.is_past ? "Завершена" : "Подтверждена";
@@ -31,7 +31,7 @@ export function bookingDetails(b, {canForget = false} = {}) {
     ${b.comment ? html`<div class="booking-demo-note">${icon("info")}<div><strong>Причина отказа</strong><p>${b.comment}</p></div></div>` : ""}
     <section class="booking-info-row booking-support">${icon("phone")}<div><h3>Поддержка</h3><p>${b.support?.message || "Поддержка скоро появится"}</p></div></section>
     ${b.access_token ? html`<details class="private-booking"><summary>${icon("share")}<span><strong>Личная ссылка на бронь</strong><small>Для другого устройства</small></span>${icon("down")}</summary><div class="private-booking-body">
-      <p>Личная ссылка откроет эту бронь на другом устройстве. Не публикуйте её.</p>
+      <p>Личная ссылка позволяет открыть и отменить эту бронь на другом устройстве. Не публикуйте её.</p>
       <label class="private-link">Личная ссылка<input readonly type="text" value="${privateBookingUrl(b.access_token)}" aria-label="Личная ссылка на бронь" autocomplete="off" spellcheck="false"></label>
       <button type="button" class="btn secondary" data-copy-booking>${icon("share")}Скопировать ссылку</button>
       <p class="copy-result note" role="status" aria-live="polite"></p>
@@ -98,22 +98,13 @@ export function wireBookingDetails(root, b) {
   });
 }
 
-export function openBookingDialog(b, {onResume, onForget, returnFocus} = {}) {
+export function openBookingDialog(b, {onResume, onForget, onChanged, returnFocus} = {}) {
   document.querySelectorAll(".booking-dialog").forEach(dialog => dialog.close());
   const dialog = document.createElement("dialog");
   dialog.className = "booking-dialog";
   dialog.setAttribute("aria-labelledby", "booking-dialog-title");
-  const resumable = onResume && b.status === "pending" && b.payment?.status === "awaiting";
-  dialog.innerHTML = String(html`<header class="booking-dialog-header">
-    <h2 id="booking-dialog-title">Бронь №${b.id}</h2>
-    <button type="button" class="booking-dialog-close" aria-label="Закрыть информацию о брони">${icon("x")}</button>
-    </header><div class="booking-dialog-content">${bookingDetails(b, {canForget: Boolean(onForget)})}</div>
-    <footer class="booking-dialog-footer">
-      ${!onForget && b.access_token ? html`<a href="bookings.html" class="btn secondary">Мои бронирования</a>` : ""}
-      ${resumable ? html`<button class="btn primary" type="button" data-dialog-resume>Продолжить оплату</button>` : html`<button class="btn primary" type="button" data-dialog-done>Готово</button>`}
-    </footer>`);
   const previous = returnFocus || document.activeElement;
-  let closing = false;
+  let closing = false, cancelling = false, confirming = false;
   const close = callback => {
     if (closing) return;
     closing = true;
@@ -124,19 +115,67 @@ export function openBookingDialog(b, {onResume, onForget, returnFocus} = {}) {
       if (callback) callback();
     });
   };
-  dialog.addEventListener("close", () => { dialog.remove(); if (previous?.isConnected) previous.focus(); }, {once: true});
+  function render() {
+    const resumable = onResume && b.status === "pending" && b.payment?.status === "awaiting";
+    dialog.innerHTML = String(html`<header class="booking-dialog-header">
+      <h2 id="booking-dialog-title">${confirming ? "Отменить бронь?" : `Бронь №${b.id}`}</h2>
+      <button type="button" class="booking-dialog-close" aria-label="Закрыть информацию о брони">${icon("x")}</button>
+      </header><div class="booking-dialog-content">
+      ${confirming ? html`<div class="booking-cancel-info">
+        <h3 class="booking-title">${b.garage.name}</h3>
+        <p>${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)}</p>
+        <p>После отмены это время смогут забронировать другие. Бронь останется в истории.</p>
+        ${b.is_demo ? html`<p class="note">Оплата была демонстрационной. Деньги не списывались.</p>` : ""}
+        <p class="cancel-error" role="status" aria-live="polite"></p>
+      </div>` : html`${b.status === "cancelled" ? html`<p class="booking-cancel-success" role="status">Бронь отменена. Время больше не удерживается за вами.</p>` : ""}${bookingDetails(b, {canForget: Boolean(onForget)})}`}
+      </div><footer class="booking-dialog-footer">
+        ${confirming ? html`<button class="btn secondary" type="button" data-cancel-back>Оставить бронь</button><button class="btn danger" type="button" data-cancel-confirm>Да, отменить</button>` : html`
+          ${b.can_cancel ? html`<button class="btn booking-cancel-button" type="button" data-cancel-booking>Отменить бронь</button>` : ""}
+          ${resumable ? html`<button class="btn primary" type="button" data-dialog-resume>Продолжить оплату</button>` : html`<button class="btn primary" type="button" data-dialog-done>Готово</button>`}`}
+      </footer>`);
+    $(".booking-dialog-close", dialog).onclick = () => close();
+    if (!confirming) wireBookingDetails(dialog, b);
+    const done = $("[data-dialog-done]", dialog), resume = $("[data-dialog-resume]", dialog), forget = $("[data-dialog-forget]", dialog);
+    if (done) done.onclick = () => close();
+    if (resume) resume.onclick = () => close(() => onResume(b));
+    if (forget) forget.onclick = () => close(() => onForget(b));
+    const cancel = $("[data-cancel-booking]", dialog), back = $("[data-cancel-back]", dialog), confirm = $("[data-cancel-confirm]", dialog);
+    if (cancel) cancel.onclick = () => { confirming = true; render(); $("[data-cancel-back]", dialog).focus(); };
+    if (back) back.onclick = () => { if (!cancelling) { confirming = false; render(); ($("[data-cancel-booking]", dialog) || $(".booking-dialog-close", dialog)).focus(); } };
+    if (confirm) confirm.onclick = async () => {
+      if (cancelling) return;
+      cancelling = true;
+      confirm.disabled = true; back.disabled = true;
+      confirm.textContent = "Отменяем…";
+      try {
+        b = await cancelBooking(b.access_token);
+        confirming = false;
+        if (dialog.open && !closing) { render(); $(".booking-dialog-close", dialog).focus(); }
+        if (onChanged) onChanged(b);
+      } catch (error) {
+        if (dialog.open && !closing) {
+          if (error.code === "cancellation_closed") b.can_cancel = false;
+          $(".cancel-error", dialog).textContent = error.code ? error.message
+            : "Не удалось получить ответ. Повторите отмену — повторного действия не будет.";
+          confirm.disabled = error.code === "cancellation_closed";
+          back.disabled = false;
+          confirm.textContent = "Да, отменить";
+        }
+      } finally { cancelling = false; }
+    };
+  }
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    const target = previous?.isConnected ? previous : document.querySelector(`[data-booking="${b.id}"] [data-open-booking]`);
+    target?.focus();
+  }, {once: true});
   dialog.addEventListener("cancel", e => { e.preventDefault(); close(); });
-  $(".booking-dialog-close", dialog).onclick = () => close();
-  const done = $("[data-dialog-done]", dialog), resume = $("[data-dialog-resume]", dialog), forget = $("[data-dialog-forget]", dialog);
-  if (done) done.onclick = () => close();
-  if (resume) resume.onclick = () => close(() => onResume(b));
-  if (forget) forget.onclick = () => close(() => onForget(b));
+  render();
   document.body.append(dialog);
-  wireBookingDetails(dialog, b);
   dialog.showModal();
 }
 
-export function bookingConfirmation(root, b, onNewBooking) {
+export function bookingConfirmation(root, b, onNewBooking, {autoOpen = true} = {}) {
   const heading = b.status === "confirmed" ? `Бронь №${b.id} подтверждена`
     : b.status === "pending" ? `Заявка №${b.id} отправлена` : `Бронь №${b.id} · ${statusText(b)}`;
   root.innerHTML = String(html`<div class="booking-result" role="status">
@@ -149,7 +188,9 @@ export function bookingConfirmation(root, b, onNewBooking) {
   </div>`);
   rememberBooking(b);
   const open = $("[data-open-booking]", root);
-  open.onclick = () => openBookingDialog(b, {returnFocus: open});
+  const show = () => openBookingDialog(b, {returnFocus: open,
+    onChanged: updated => bookingConfirmation(root, updated, onNewBooking, {autoOpen: false})});
+  open.onclick = show;
   if (onNewBooking) $("[data-new-booking]", root).onclick = onNewBooking;
-  openBookingDialog(b, {returnFocus: open});
+  if (autoOpen) show();
 }

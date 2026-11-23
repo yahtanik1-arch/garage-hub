@@ -10,7 +10,7 @@ from core.config import WEB_HOST, WEB_PORT
 
 async def check_database(app):
     if not await db.readiness():
-        raise RuntimeError("Примените миграции sql/000–006 перед запуском сайта")
+        raise RuntimeError("Примените миграции sql/000–007 перед запуском сайта")
 
 
 def main():

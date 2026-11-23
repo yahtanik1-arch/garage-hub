@@ -40,3 +40,17 @@ export async function loadBookings(tokens) {
   }
   return bookings;
 }
+
+
+export async function cancelBooking(token) {
+  const response = await fetch("/api/public/cancel-booking", {method: "POST",
+    headers: {"Content-Type": "application/json", Authorization: `Booking ${token}`},
+    body: JSON.stringify({confirm: true}), signal: AbortSignal.timeout(15000)});
+  const result = await response.json();
+  if (!response.ok) {
+    const error = new Error(result.error?.message || "Не удалось отменить бронь.");
+    error.code = result.error?.code;
+    throw error;
+  }
+  return result;
+}

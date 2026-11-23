@@ -30,16 +30,17 @@ root.innerHTML = String(shell());
 
 function card(b) {
   return html`<article class="my-booking" data-booking="${b.id}">
-    <div class="my-booking-row"><div><strong>Бронь №${b.id} · ${b.garage.name}</strong>
-      <span class="booking-subtitle">${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)} · ${statusText(b)}</span></div>
-      <button type="button" class="btn secondary" data-open-booking>Открыть бронь</button>
-    </div></article>`;
+    <button type="button" class="my-booking-row" data-open-booking aria-haspopup="dialog">
+      <span><strong>Бронь №${b.id} · ${b.garage.name}</strong>
+        <span class="booking-subtitle">${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)} · ${statusText(b)}</span></span>
+      <span class="booking-row-action">Подробнее <span aria-hidden="true">›</span></span>
+    </button></article>`;
 }
 
 let openedToken = null;
 function showBooking(b, returnFocus) {
   openedToken = b.access_token;
-  openBookingDialog(b, {returnFocus,
+  openBookingDialog(b, {returnFocus, onChanged: () => refresh(),
     onResume: b => checkout(root, b, refresh, paid => { refresh(); showBooking(paid); }),
     onForget: b => {
       if (!forgetBooking(b.access_token)) { $(".import-message").textContent = "Не удалось изменить сохранённые брони в браузере."; return; }

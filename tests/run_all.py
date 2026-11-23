@@ -23,6 +23,7 @@ SUITES = [
     ("Сайт без Telegram и публичные заявки", "t_website.py"),
     ("Демонстрационная оплата и автоподтверждение", "t_demo_payments.py"),
     ("Мои бронирования и личные ссылки", "t_my_bookings.py"),
+    ("Отмена брони на сайте", "t_website_cancellation.py"),
     ("Сценарии бота", "t_all.py"),
     ("Ядро доступа: PostgreSQL, worker, webhook и права", "t_access.py"),
 ]

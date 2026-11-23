@@ -71,7 +71,7 @@ async def main():
         r = await post({**payload, "total_price": 1, "client_telegram_id": 999}, key=key)
         b = await r.json()
         assert r.status == 201 and b["status"] == "pending" and b["total"] == 1000, b
-        assert b["can_cancel"] is False and "web_client_phone" not in b and "PRIVATE_" not in json.dumps(b)
+        assert b["can_cancel"] is True and "web_client_phone" not in b and "PRIVATE_" not in json.dumps(b)
         bid = b["id"]
         stored = await db.booking(bid)
         assert stored["client_telegram_id"] is None and stored["web_client_phone"] == "+79001112233"

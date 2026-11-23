@@ -300,3 +300,7 @@ async def website_bookings(tokens):
     if not tokens:
         return []
     return await rpc("gh_website_bookings", p_tokens=tokens)
+
+
+async def cancel_website_booking(token):
+    return _first(await rpc("gh_cancel_website_booking", p_token=token, p_admins=ADMIN_IDS))
