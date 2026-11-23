@@ -47,6 +47,48 @@ export function wireBookingDetails(root, b) {
     const details = $(".private-booking", root);
     if (details) details.open = true;
   }
+  const details = $(".private-booking", root);
+  if (details) {
+    const summary = $("summary", details), body = $(".private-booking-body", details);
+    let animation = null;
+    let expanded = details.open;
+    summary.setAttribute("aria-expanded", String(expanded));
+    summary.addEventListener("click", e => {
+      e.preventDefault();
+      expanded = !expanded;
+      const from = details.offsetHeight;
+      if (animation) animation.cancel();
+      summary.setAttribute("aria-expanded", String(expanded));
+      if (!details.animate || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        animation = null;
+        details.open = expanded;
+        details.style.height = "";
+        details.style.overflow = "";
+        return;
+      }
+      details.style.height = `${from}px`;
+      details.style.overflow = "hidden";
+      details.open = true; // Keep the content rendered until the closing animation ends.
+      const to = summary.offsetHeight + (expanded ? body.offsetHeight : 0);
+      const current = details.animate({height: [`${from}px`, `${to}px`]}, {
+        duration: 240, easing: "cubic-bezier(.16, 1, .3, 1)",
+      });
+      animation = current;
+      current.onfinish = () => {
+        if (animation !== current) return;
+        details.open = expanded;
+        details.style.height = "";
+        details.style.overflow = "";
+        animation = null;
+      };
+    });
+    details.addEventListener("toggle", () => {
+      if (!animation) {
+        expanded = details.open;
+        summary.setAttribute("aria-expanded", String(expanded));
+      }
+    });
+  }
   const button = $("[data-copy-booking]", root);
   if (!button) return;
   button.addEventListener("click", async () => {

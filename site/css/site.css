@@ -596,10 +596,15 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 .private-booking > summary::-webkit-details-marker { display: none; }
 .private-booking > summary > svg { width: 20px; height: 20px; color: var(--text-2); flex-shrink: 0; }
 .private-booking > summary > svg:last-child { margin-left: auto; transition: transform 180ms var(--ease-out); }
-.private-booking[open] > summary > svg:last-child { transform: rotate(180deg); }
+.private-booking > summary[aria-expanded="true"] > svg:last-child { transform: rotate(180deg); }
 .private-booking summary strong { display: block; font-size: 14px; font-weight: 600; }
 .private-booking summary small { display: block; margin-top: 3px; color: var(--text-2); font-size: 12px; }
 .private-booking-body { padding-bottom: 12px; }
+.private-booking[open] .private-booking-body { animation: private-link-content-in 180ms ease-out backwards; }
+@keyframes private-link-content-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+ .private-booking[open] .private-booking-body { animation: none; }
+}
 .private-booking-body > p { margin-bottom: 14px; font-size: 13px; color: var(--text-2); }
 .private-link { display: block; font-size: 13px; }
 .private-link input { display: block; margin-top: 6px; font-size: 13px; }
