@@ -38,6 +38,8 @@ class User:
 
 
 def validate_init_data(init_data: str) -> Optional[User]:
+    if not TOKEN:
+        return None
     try:
         pairs = dict(parse_qsl(init_data, keep_blank_values=True))
     except ValueError:

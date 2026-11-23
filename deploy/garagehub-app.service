@@ -1,5 +1,5 @@
 [Unit]
-Description=GarageHub Telegram webhook and Mini App
+Description=GarageHub Telegram bot and webhook
 After=network-online.target garagehub-postgrest.service
 Wants=network-online.target
 
@@ -10,6 +10,7 @@ Group=garagehub
 WorkingDirectory=/opt/garagehub
 EnvironmentFile=/opt/garagehub/.env
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=WEB_PORT=8081
 ExecStart=/opt/garagehub/venv/bin/python /opt/garagehub/bot.py
 Restart=on-failure
 RestartSec=5

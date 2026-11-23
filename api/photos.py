@@ -1,4 +1,4 @@
-"""Фото объектов. В базе хранятся file_id Telegram; приложение получает их по /api/photo/<file_id>.
+"""Фото объектов. В базе хранятся file_id Telegram или local:имя.jpg; приложение получает их по /api/photo/<file_id>.
 
 Сервер один раз скачивает файл у Telegram, кладёт в cache/photos и дальше отдаёт сам.
 Отдаём только те file_id, которые есть у объектов каталога: прокси не открыт для чужих файлов бота.
@@ -6,13 +6,14 @@
 import asyncio
 import hashlib
 import logging
+import re
 import time
 from typing import Dict, Optional, Set
 
 from aiohttp import web
 
 from core import db
-from core.config import CACHE_DIR
+from core.config import ASSETS_DIR, CACHE_DIR
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +45,19 @@ async def photo(request: web.Request) -> web.StreamResponse:
     file_id = request.match_info["file_id"]
     if len(file_id) > 300 or not await is_known(file_id):
         raise web.HTTPNotFound()
+    if file_id.startswith("local:"):
+        name = file_id[6:]
+        if not re.fullmatch(r"[A-Za-z0-9_-]+\.(?:jpg|png|webp)", name):
+            raise web.HTTPNotFound()
+        path = ASSETS_DIR / "garages" / name
+        if not path.is_file():
+            raise web.HTTPNotFound()
+        return web.FileResponse(path, headers={"Cache-Control": "public, max-age=604800, immutable"})
     path = cache_path(file_id)
+    if not path.exists() and request.app["bot"] is None:
+        # uncached Telegram file_id must not make the standalone site wait on Telegram.
+        return web.FileResponse(ASSETS_DIR / "placeholder.png",
+                                headers={"Cache-Control": "public, max-age=60"})
     if not path.exists():
         lock = _locks.setdefault(file_id, asyncio.Lock())
         async with lock:

@@ -208,6 +208,8 @@ async def wait_for_shutdown() -> None:
 
 async def main() -> None:
     setup_logging()
+    if not TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN не найден в .env")
     validate_config(TELEGRAM_WEBHOOK_URL, TELEGRAM_WEBHOOK_SECRET)
     if not check_schema():
         log.error("Примените миграции sql/000–003 по README и перезапустите бота.")

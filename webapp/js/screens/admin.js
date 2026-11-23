@@ -53,7 +53,7 @@ function shiftDay(iso, delta) {
 /* ── Заявки ─────────────────────────────────────────────── */
 
 function request(b) {
-  const client = b.client_username ? html`<a data-action="tg" data-handle="${b.client_username}">@${b.client_username}</a>` : html`id ${b.client_id}`;
+  const client = b.client_phone ? html`${b.client_name}, <a data-action="call" data-phone="${b.client_phone}">${b.client_phone}</a>` : b.client_username ? html`<a data-action="tg" data-handle="${b.client_username}">@${b.client_username}</a>` : html`id ${b.client_id}`;
   return html`
     <article class="req" data-id="${b.id}">
       <div class="top">
@@ -241,7 +241,7 @@ async function confirm(el) {
   try {
     const { booking, delivered } = await api.admin.confirm(Number(el.dataset.id));
     haptic.success();
-    toast(delivered ? "Подтверждено, клиент получил сообщение" : "Подтверждено, уведомление в очереди");
+    toast(booking.client_phone ? "Подтверждено. Сообщите клиенту по телефону" : delivered ? "Подтверждено, клиент получил сообщение" : "Подтверждено, уведомление в очереди");
     applyDecision(booking);
   } catch (e) {
     el.classList.remove("is-loading");
@@ -260,7 +260,7 @@ function rejectSheet(id) {
     try {
       const { booking, delivered } = await api.admin.reject(id, text);
       sheet.close();
-      toast(delivered ? "Отказ отправлен клиенту" : "Отклонено, уведомление в очереди");
+      toast(booking.client_phone ? "Отклонено. Сообщите клиенту по телефону" : delivered ? "Отказ отправлен клиенту" : "Отклонено, уведомление в очереди");
       applyDecision(booking);
     } catch (e) {
       el.classList.remove("is-loading");

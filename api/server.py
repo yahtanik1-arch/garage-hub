@@ -1,4 +1,4 @@
-"""Веб-сервер: API + статические файлы приложения. Работает в одном процессе с ботом."""
+"""API и статика. python -m api работает независимо от Telegram."""
 import logging
 from typing import Optional
 
@@ -7,7 +7,7 @@ from aiohttp import web
 
 from api import photos, routes
 from core.config import (
-    TELEGRAM_WEBHOOK_SECRET, TELEGRAM_WEBHOOK_URL, WEB_HOST, WEB_PORT, WEBAPP_DIR,
+    BASE_DIR, TELEGRAM_WEBHOOK_SECRET, TELEGRAM_WEBHOOK_URL, WEB_HOST, WEB_PORT, WEBAPP_DIR,
 )
 from tgbot.webhook import WEBHOOK_PATH, WebhookHandler, validate_config
 
@@ -18,7 +18,8 @@ async def index(request: web.Request) -> web.StreamResponse:
     return web.FileResponse(WEBAPP_DIR / "index.html")
 
 
-def build_app(bot: Bot, dispatcher: Optional[Dispatcher] = None) -> web.Application:
+def build_app(bot: Optional[Bot] = None, dispatcher: Optional[Dispatcher] = None,
+              website: bool = False) -> web.Application:
     app = web.Application(
         middlewares=[routes.headers_middleware, routes.errors_middleware, routes.auth_middleware],
         client_max_size=64 * 1024,
@@ -31,8 +32,13 @@ def build_app(bot: Bot, dispatcher: Optional[Dispatcher] = None) -> web.Applicat
         webhook = WebhookHandler(bot, dispatcher, TELEGRAM_WEBHOOK_SECRET)
         app.router.add_post(WEBHOOK_PATH, webhook.handle)
         app.on_shutdown.append(webhook.shutdown)
-    app.router.add_get("/", index)
-    app.router.add_static("/", WEBAPP_DIR, show_index=False)
+    if website:
+        async def site_index(request):
+            return web.FileResponse(BASE_DIR / "site" / "index.html")
+        app.router.add_get("/", site_index)
+    else:
+        app.router.add_get("/", index)
+    app.router.add_static("/", BASE_DIR / "site" if website else WEBAPP_DIR, show_index=False)
     return app
 
 

@@ -695,11 +695,17 @@ def ago(dt: datetime, current: datetime) -> str:
     return dt.strftime("%d.%m %H:%M")
 
 
+def booking_client(b: dict) -> str:
+    if b.get("web_client_phone"):
+        return f"{b.get('web_client_name') or 'Клиент сайта'} · {b['web_client_phone']}"
+    return username_label(b.get("client_username"), b["client_telegram_id"])
+
+
 def admin_booking_card(b: dict, g: Optional[dict], start: datetime, end: datetime,
                        created: Optional[datetime], current: datetime, title: str = "") -> str:
     g = g or {}
     name = g.get("name") or "Объект недоступен"
-    client = username_label(b.get("client_username"), b["client_telegram_id"])
+    client = booking_client(b)
     lines = [
         f"<b>{title or 'Заявка'} №{b['id']}</b> · {status_line(b['status'])}",
         DIVIDER,
@@ -736,7 +742,7 @@ def day_schedule(day: date, rows: List[tuple], offset: int) -> str:
         lines.append("Броней нет.")
     for b, name, start, end in rows:
         icon, _ = STATUS.get(b["status"], ("•", ""))
-        client = username_label(b.get("client_username"), b["client_telegram_id"])
+        client = booking_client(b)
         lines.append(f"{icon} <b>{time_span(start, end)}</b>  {h(clip(name, 22))}")
         lines.append(f"      {h(client)} · {money(b['total_price'])}")
     if rows:
@@ -755,7 +761,7 @@ REJECT_CUSTOM = "Напишите причину отказа одним соо�
 
 
 def client_cancelled_for_admin(b: dict, name: str, start: datetime, end: datetime) -> str:
-    client = username_label(b.get("client_username"), b["client_telegram_id"])
+    client = booking_client(b)
     return (
         f"<b>Клиент отменил заявку №{b['id']}</b>\n"
         f"{DIVIDER}\n"
