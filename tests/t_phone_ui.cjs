@@ -57,7 +57,8 @@ const server = http.createServer(async (req, res) => {
       await phone.focus(); await consent.click(); assert.equal(await consent.isChecked(), false);
       await phone.focus(); await consent.click(); assert(await consent.isChecked());
       await page.locator('#booking button[type=submit]').click();
-      await page.getByRole('heading', {name: 'Заявка №1 отправлена'}).waitFor();
+      await page.locator('.booking-dialog[open]').waitFor();
+      assert.equal(await page.locator('#booking .booking-details').count(), 0);
       assert.equal(requests.length, 1); assert.equal(requests[0].phone, '+79991234567');
       assert.deepEqual(errors, []);
       console.log(`PASS ${width}px: first consent click/tap, phone blur, excess digits, mobile input, submission`);

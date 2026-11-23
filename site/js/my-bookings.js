@@ -1,8 +1,8 @@
-import {html, $, $$} from "./dom.js";
+import {html, $} from "./dom.js";
 import {dayLong, hhmm} from "./format.js";
 import {boot} from "./ui.js";
 import {savedBookings, loadBookings, rememberBooking, forgetBooking, validToken} from "./bookings-store.js";
-import {bookingDetails, wireBookingDetails, statusText} from "./booking-details.js";
+import {openBookingDialog, statusText} from "./booking-details.js";
 import {checkout} from "./payment.js";
 
 boot();
@@ -30,15 +30,24 @@ root.innerHTML = String(shell());
 
 function card(b) {
   return html`<article class="my-booking" data-booking="${b.id}">
-    <details ${focused === b.access_token ? "open" : ""}>
-      <summary><span><strong>Бронь №${b.id} · ${b.garage.name}</strong><span class="booking-subtitle">${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)} · ${statusText(b)}</span></span><span aria-hidden="true">⌄</span></summary>
-      <div class="my-booking-content">${bookingDetails(b)}
-        ${b.status === "pending" && b.payment?.status === "awaiting" ? html`<button class="btn primary" type="button" data-resume-payment>Продолжить тестовую оплату</button>` : ""}
-        <button class="btn" type="button" data-forget-booking>Убрать с этого устройства</button>
-        <p class="note">Убирает сохранённую ссылку из этого браузера. Саму бронь не отменяет.</p>
-      </div>
-    </details>
-  </article>`;
+    <div class="my-booking-row"><div><strong>Бронь №${b.id} · ${b.garage.name}</strong>
+      <span class="booking-subtitle">${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)} · ${statusText(b)}</span></div>
+      <button type="button" class="btn secondary" data-open-booking>Открыть бронь</button>
+    </div></article>`;
+}
+
+let openedToken = null;
+function showBooking(b, returnFocus) {
+  openedToken = b.access_token;
+  openBookingDialog(b, {returnFocus,
+    onResume: b => checkout(root, b, refresh, paid => { refresh(); showBooking(paid); }),
+    onForget: b => {
+      if (!forgetBooking(b.access_token)) { $(".import-message").textContent = "Не удалось изменить сохранённые брони в браузере."; return; }
+      if (focused === b.access_token) focused = null;
+      openedToken = null;
+      refresh();
+    },
+  });
 }
 
 async function refresh() {
@@ -63,15 +72,11 @@ async function refresh() {
       <div class="empty"><h2 class="h-3">Здесь пока нет бронирований</h2><p>Выберите бокс в каталоге или откройте личную ссылку на уже созданную бронь.</p><a class="btn primary" href="catalog.html">Найти бокс</a></div>`);
     for (const b of bookings) {
       const article = $(`[data-booking="${b.id}"]`, list);
-      wireBookingDetails(article, b);
-      const resume = $("[data-resume-payment]", article);
-      if (resume) resume.onclick = () => checkout(article, b, refresh);
-      $("[data-forget-booking]", article).onclick = () => {
-        if (!forgetBooking(b.access_token)) { $(".import-message").textContent = "Не удалось изменить сохранённые брони в браузере."; return; }
-        if (focused === b.access_token) focused = null;
-        refresh();
-      };
+      const open = $("[data-open-booking]", article);
+      open.onclick = () => showBooking(b, open);
     }
+    const imported = bookings.find(b => b.access_token === focused);
+    if (imported && focused !== openedToken) showBooking(imported);
     const button = $("[data-refresh-bookings]");
     if (button) button.onclick = refresh;
   } catch {
@@ -91,9 +96,10 @@ $(".import-booking").addEventListener("submit", e => {
     if (!validToken(token)) token = new URLSearchParams(new URL(raw, location.href).hash.slice(1)).get("booking");
     if (!validToken(token)) throw new Error();
     focused = token.toLowerCase();
+    openedToken = null;
     refresh();
   } catch { $(".import-message").textContent = "Вставьте личную ссылку из подтверждения брони."; }
 });
-window.addEventListener("hashchange", () => { readPrivateLink(); refresh(); });
+window.addEventListener("hashchange", () => { readPrivateLink(); openedToken = null; refresh(); });
 window.addEventListener("storage", e => { if (e.key === "gh_website_bookings_v1") refresh(); });
 refresh();

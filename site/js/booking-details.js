@@ -48,3 +48,44 @@ export function wireBookingDetails(root, b) {
     catch { input.focus(); input.select(); result.textContent = "Скопируйте выделенную ссылку."; }
   });
 }
+
+export function openBookingDialog(b, {onResume, onForget, returnFocus} = {}) {
+  document.querySelectorAll(".booking-dialog").forEach(dialog => dialog.close());
+  const dialog = document.createElement("dialog");
+  dialog.className = "booking-dialog";
+  dialog.setAttribute("aria-labelledby", "booking-dialog-title");
+  dialog.innerHTML = String(html`<header class="booking-dialog-header">
+    <h2 class="h-3" id="booking-dialog-title">Бронь №${b.id}</h2>
+    <button type="button" class="booking-dialog-close" aria-label="Закрыть информацию о брони">×</button>
+    </header><div class="booking-dialog-content">${bookingDetails(b)}
+    ${onResume && b.status === "pending" && b.payment?.status === "awaiting" ? html`<button class="btn primary" type="button" data-dialog-resume>Продолжить тестовую оплату</button>` : ""}
+    ${onForget ? html`<button class="btn" type="button" data-dialog-forget>Убрать с этого устройства</button><p class="note">Убирает сохранённую ссылку из этого браузера. Саму бронь не отменяет.</p>` : ""}
+    </div>`);
+  const previous = returnFocus || document.activeElement;
+  dialog.addEventListener("close", () => { dialog.remove(); if (previous?.isConnected) previous.focus(); }, {once: true});
+  $(".booking-dialog-close", dialog).onclick = () => dialog.close();
+  const resume = $("[data-dialog-resume]", dialog), forget = $("[data-dialog-forget]", dialog);
+  if (resume) resume.onclick = () => { dialog.close(); onResume(b); };
+  if (forget) forget.onclick = () => { dialog.close(); onForget(b); };
+  document.body.append(dialog);
+  wireBookingDetails(dialog, b);
+  dialog.showModal();
+}
+
+export function bookingConfirmation(root, b, onNewBooking) {
+  const heading = b.status === "confirmed" ? `Бронь №${b.id} подтверждена`
+    : b.status === "pending" ? `Заявка №${b.id} отправлена` : `Бронь №${b.id} · ${statusText(b)}`;
+  root.innerHTML = String(html`<div class="booking-result" role="status">
+    <h2 class="h-3">${heading}</h2>
+    <p>${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)} · ${money(b.total)}</p>
+    <div class="booking-confirmation-actions"><button type="button" class="btn secondary" data-open-booking>Открыть бронь</button>
+    <a href="bookings.html" class="btn secondary">Мои бронирования</a>
+    ${onNewBooking ? html`<button class="btn l block" type="button" data-new-booking>Выбрать другое время</button>` : ""}
+    </div>
+  </div>`);
+  rememberBooking(b);
+  const open = $("[data-open-booking]", root);
+  open.onclick = () => openBookingDialog(b, {returnFocus: open});
+  if (onNewBooking) $("[data-new-booking]", root).onclick = onNewBooking;
+  openBookingDialog(b, {returnFocus: open});
+}

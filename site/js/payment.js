@@ -1,6 +1,6 @@
 import { html, $, $$, safeStorage } from "./dom.js";
 import { dayLong, hhmm, money } from "./format.js";
-import { bookingDetails, wireBookingDetails } from "./booking-details.js";
+import { bookingConfirmation } from "./booking-details.js";
 import { rememberBooking } from "./bookings-store.js";
 
 const storage = safeStorage("session");
@@ -19,16 +19,10 @@ async function request(token, action) {
 }
 
 export function receipt(form, b) {
-  form.innerHTML = String(html`<div class="booking-result" role="status">
-    <h2 class="h-3">Бронь №${b.id} подтверждена</h2>
-    ${bookingDetails(b)}
-    <button class="btn l block" type="button" data-new-booking>Выбрать другое время</button>
-  </div>`);
-  wireBookingDetails(form, b);
-  $("[data-new-booking]", form).onclick = () => { storage.removeItem(key(b.garage.id)); location.reload(); };
+  bookingConfirmation(form, b, () => { storage.removeItem(key(b.garage.id)); location.reload(); });
 }
 
-export function checkout(form, b, onCancel) {
+export function checkout(form, b, onCancel, onPaid) {
   rememberBooking(b);
   const token = b.payment.token;
   const storageKey = key(b.garage.id);
@@ -52,7 +46,9 @@ export function checkout(form, b, onCancel) {
   const focusBefore = document.activeElement;
   function finish(result) {
     if (result.status === "confirmed" && result.payment.status === "paid") {
-      close(); receipt(form, result); return true;
+      close();
+      if (onPaid) onPaid(result); else receipt(form, result);
+      return true;
     }
     if (result.status !== "pending" || result.payment.status !== "awaiting") {
       storage.removeItem(storageKey); close(); onCancel(); return true;

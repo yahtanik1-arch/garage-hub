@@ -563,10 +563,7 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 .import-booking button { flex-shrink: 0; }
 .import-message { margin-top: 8px; }
 .my-booking { border-bottom: 1px solid var(--line); }
-.my-booking summary { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; gap: 16px; cursor: pointer; list-style: none; }
-.my-booking summary::-webkit-details-marker { display: none; }
 .booking-subtitle { display: block; margin-top: 6px; font-size: 14px; color: var(--text-2); }
-.my-booking-content { padding-bottom: 24px; }
 .booking-details > p { margin: 12px 0; }
 .booking-details section { padding: 20px 0; border-top: 1px solid var(--line); }
 .booking-details section p { margin: 10px 0; }
@@ -576,10 +573,24 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 .arrival-instructions { white-space: pre-line; }
 .private-link { display: block; font-size: 14px; }
 .private-link input { display: block; margin-top: 6px; }
+.booking-details .private-link + [data-copy-booking] { margin-top: 16px; }
 .booking-history-title { margin-top: 32px; }
 @media (max-width: 650px) {
  .header .my-bookings-link { margin-left: auto; }
  .header .my-bookings-link + .btn { display: none; }
  .import-booking > div { flex-direction: column; }
- .my-booking summary { align-items: start; }
 }
+
+.my-booking-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; }
+.my-booking-row .btn { flex-shrink: 0; }
+.booking-dialog { width: min(620px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); color: var(--text); }
+.booking-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.booking-dialog-header { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.booking-dialog-close { width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; font-size: 28px; }
+.booking-dialog-close:hover { background: var(--fill); }
+.booking-dialog-content { padding: 0 20px 20px; }
+.booking-dialog-content > .btn { margin-top: 12px; }
+@media (max-width: 650px) { .my-booking-row { align-items: start; flex-direction: column; gap: 12px; } }
+
+.booking-confirmation-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.booking-result > p { margin-top: 12px; }

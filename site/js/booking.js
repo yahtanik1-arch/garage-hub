@@ -3,7 +3,7 @@ import { dayLong, hhmm, money } from "./format.js";
 import { DEMO } from "./data.js";
 import { wirePhone } from "./phone.js";
 import { rememberBooking } from "./bookings-store.js";
-import { bookingDetails, wireBookingDetails } from "./booking-details.js";
+import { bookingConfirmation } from "./booking-details.js";
 import { checkout, resumePayment } from "./payment.js";
 
 export function bookingForm(av, demoPayment = false) {
@@ -99,11 +99,7 @@ export function wireBooking(root, g, av) {
         checkout(form, b, reset);
         return;
       }
-      form.innerHTML = String(html`<div class="booking-result" role="status">
-        <h2 class="h-3">Заявка №${b.id} отправлена</h2>
-        ${bookingDetails(b)}
-      </div>`);
-      wireBookingDetails(form, b);
+      bookingConfirmation(form, b);
     } catch (error) {
       result.textContent = error.name === "TimeoutError" || error.name === "TypeError"
         ? "Ответ не получен. Повторите отправку с теми же данными — повторная заявка не создастся."
