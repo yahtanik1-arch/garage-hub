@@ -55,10 +55,9 @@ export function skeletonGrid(n = 4) {
 export function errorState(kind) {
   const text = kind === "not_found"
     ? html`<p class="h-3">Такого бокса нет в каталоге</p><p>Возможно, его сняли с размещения. Посмотрите другие боксы.</p><a class="btn secondary" href="${catalogUrl()}">Открыть каталог</a>`
-    : html`<p class="h-3">Каталог сейчас не загрузился</p><p>Проверьте интернет и обновите страницу. Если не поможет, напишите нам: ${raw_phone}.</p><button class="btn secondary" type="button" onclick="location.reload()">Обновить страницу</button>`;
+    : html`<p class="h-3">Каталог сейчас не загрузился</p><p>Проверьте интернет и обновите страницу. Если не поможет, попробуйте позже. Поддержка скоро появится.</p><button class="btn secondary" type="button" onclick="location.reload()">Обновить страницу</button>`;
   return html`<div class="empty">${text}</div>`;
 }
-const raw_phone = "+7 (999) 462-47-30";
 
 /* Плавная замена содержимого: браузеры с View Transitions сами смешают старое и новое */
 export function swap(el, markup) {

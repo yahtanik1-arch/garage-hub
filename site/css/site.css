@@ -553,3 +553,33 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 .phone-feedback .phone-error[hidden] { display: block; visibility: hidden; }
 .booking-form .booking-consent { min-height: 44px; padding-block: 8px; cursor: pointer; }
 .booking-consent input { width: 20px; height: 20px; cursor: pointer; }
+
+.bookings-page { max-width: 960px; padding-top: 40px; padding-bottom: 64px; }
+.bookings-intro { margin: 16px 0 24px; color: var(--text-2); }
+.import-booking { margin-bottom: 32px; }
+.import-booking label { display: block; font-weight: 600; margin-bottom: 8px; }
+.import-booking > div { display: flex; gap: 8px; }
+.import-booking input, .private-link input { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.import-booking button { flex-shrink: 0; }
+.import-message { margin-top: 8px; }
+.my-booking { border-bottom: 1px solid var(--line); }
+.my-booking summary { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; gap: 16px; cursor: pointer; list-style: none; }
+.my-booking summary::-webkit-details-marker { display: none; }
+.booking-subtitle { display: block; margin-top: 6px; font-size: 14px; color: var(--text-2); }
+.my-booking-content { padding-bottom: 24px; }
+.booking-details > p { margin: 12px 0; }
+.booking-details section { padding: 20px 0; border-top: 1px solid var(--line); }
+.booking-details section p { margin: 10px 0; }
+.booking-details .btn { margin: 8px 8px 0 0; }
+.booking-badge { font-weight: 700; }
+.booking-notice { padding: 14px; border-radius: 12px; background: var(--fill); }
+.arrival-instructions { white-space: pre-line; }
+.private-link { display: block; font-size: 14px; }
+.private-link input { display: block; margin-top: 6px; }
+.booking-history-title { margin-top: 32px; }
+@media (max-width: 650px) {
+ .header .my-bookings-link { margin-left: auto; }
+ .header .my-bookings-link + .btn { display: none; }
+ .import-booking > div { flex-direction: column; }
+ .my-booking summary { align-items: start; }
+}

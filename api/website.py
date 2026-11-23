@@ -11,6 +11,7 @@ from aiohttp import web
 from api import serializers
 from api.routes import body, int_param, ok, text_field
 from core import db, service
+from core.utils import now, parse_dt
 
 
 def client_hash(request):
@@ -69,6 +70,18 @@ def check_origin(request):
 def booking_result(b, g):
     result = serializers.booking_json(b, g)
     result["can_cancel"] = False
+    if b.get("client_telegram_id") is None and b.get("web_booking_token"):
+        result["access_token"] = b["web_booking_token"]
+        result["is_past"] = parse_dt(b["end_time"]) <= now()
+        demo = bool(b.get("demo_payment_token") or (g and g.get("demo_payment")))
+        result["is_demo"] = demo
+        if b["status"] == "confirmed" and not result["is_past"]:
+            result["arrival"] = {
+                "instructions": ("Это демонстрационная бронь. Физического бокса нет: приезжать и платить не нужно."
+                    if demo else (g or {}).get("arrival_instructions") or "Инструкция по входу пока не добавлена."),
+                "can_show_route": bool(not demo and (g or {}).get("address")),
+            }
+        result["support"] = {"message": "Поддержка скоро появится"}
     if b.get("demo_payment_token"):
         # This capability is returned only to its creator or the holder of this random token.
         result["payment"] = {"mode": "demo", "token": b["demo_payment_token"],
@@ -113,3 +126,22 @@ def russian_phone(value):
     if len(digits) != 10:
         raise service.ServiceError("bad_phone", message)
     return "+7" + digits
+
+
+async def my_bookings(request):
+    check_origin(request)
+    if request.content_type != "application/json":
+        raise service.ServiceError("bad_json", "Нужен JSON-запрос.", 415)
+    data = await body(request)
+    tokens = data.get("tokens")
+    if not isinstance(tokens, list) or len(tokens) > 100:
+        raise service.ServiceError("bad_tokens", "Не удалось прочитать список бронирований.")
+    try:
+        if any(not isinstance(token, str) for token in tokens):
+            raise ValueError()
+        tokens = list({str(UUID(token)) for token in tokens})
+    except (TypeError, ValueError, AttributeError):
+        raise service.ServiceError("bad_tokens", "Некорректная ссылка на бронь.")
+    rows = await db.website_bookings(tokens)
+    garages = await db.garages_by_ids(b["garage_id"] for b in rows)
+    return ok({"bookings": [booking_result(b, garages.get(b["garage_id"])) for b in rows]})

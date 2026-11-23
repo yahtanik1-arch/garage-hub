@@ -293,3 +293,10 @@ async def lock_overview():
 
 async def worker_tick():
     await rpc("gh_worker_tick", p_admins=ADMIN_IDS)
+
+
+async def website_bookings(tokens):
+    """Only the supplied private capabilities, never a lookup by phone or numeric ID."""
+    if not tokens:
+        return []
+    return await rpc("gh_website_bookings", p_tokens=tokens)

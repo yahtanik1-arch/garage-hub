@@ -2,6 +2,8 @@ import { html, $, $$ } from "./dom.js";
 import { dayLong, hhmm, money } from "./format.js";
 import { DEMO } from "./data.js";
 import { wirePhone } from "./phone.js";
+import { rememberBooking } from "./bookings-store.js";
+import { bookingDetails, wireBookingDetails } from "./booking-details.js";
 import { checkout, resumePayment } from "./payment.js";
 
 export function bookingForm(av, demoPayment = false) {
@@ -89,16 +91,19 @@ export function wireBooking(root, g, av) {
       });
       const b = await response.json();
       if (!response.ok) throw new Error(b.error?.message || "Не удалось отправить заявку.");
-      if (b.payment?.mode === "demo") {
+      rememberBooking(b);
+      if (b.payment?.mode === "demo" && b.payment.status === "paid" && b.status === "confirmed") {
+        const { receipt } = await import("./payment.js"); receipt(form, b); return;
+      }
+      if (b.payment?.mode === "demo" && b.status === "pending" && b.payment.status === "awaiting") {
         checkout(form, b, reset);
         return;
       }
       form.innerHTML = String(html`<div class="booking-result" role="status">
         <h2 class="h-3">Заявка №${b.id} отправлена</h2>
-        <p>${dayLong(b.date)}, ${hhmm(b.start_hour)}–${hhmm(b.end_hour)}</p>
-        <p>Сумма: ${money(b.total)}. Оплата на месте.</p>
-        <p>Ожидайте подтверждения по указанному телефону. Отправка заявки ещё не означает подтверждение брони.</p>
+        ${bookingDetails(b)}
       </div>`);
+      wireBookingDetails(form, b);
     } catch (error) {
       result.textContent = error.name === "TimeoutError" || error.name === "TypeError"
         ? "Ответ не получен. Повторите отправку с теми же данными — повторная заявка не создастся."

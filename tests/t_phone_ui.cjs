@@ -18,7 +18,7 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/api/public/bookings' && req.method === 'POST') {
     let body = ''; for await (const chunk of req) body += chunk;
     requests.push(JSON.parse(body)); res.statusCode = 201;
-    return json({id: 1, date: tomorrow, start_hour: 10, end_hour: 11, total: 500, status: 'pending'});
+    return json({id: 1, date: tomorrow, start_hour: 10, end_hour: 11, total: 500, status: 'pending', garage, support: {message: 'Поддержка скоро появится'}});
   }
   try {
     const filename = path.resolve(root, '.' + new URL(req.url, 'http://local').pathname);
