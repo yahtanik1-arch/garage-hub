@@ -103,7 +103,7 @@ def check_schema() -> bool:
         supabase.table("garages").select("is_active, open_hour, close_hour").limit(1).execute()
         supabase.table("bookings").select("admin_reminded, client_wait_notified, visit_reminded").limit(1).execute()
         supabase.table("owner_requests").select("id").limit(1).execute()
-        if not supabase.rpc("gh_readiness").execute().data:
+        if not supabase.rpc("gh_readiness", {}).execute().data:
             return False
         if TELEGRAM_WEBHOOK_URL:
             supabase.table("telegram_updates").select("bot_id, update_id").limit(1).execute()
