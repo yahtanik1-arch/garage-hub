@@ -590,8 +590,8 @@ html.gh-intro .page { animation: gh-app-in calc(var(--gh-k) * .5s) calc(var(--gh
 .booking-info-row p { margin-top: 6px; font-size: 14px; line-height: 1.55; }
 .booking-support p { color: var(--text-2); }
 .arrival-instructions { white-space: pre-line; }
-.booking-route { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--link); }
-.booking-route svg { width: 16px; height: 16px; }
+.booking-route { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 10px; padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--link); white-space: normal; text-align: left; }
+.booking-route svg { width: 16px; height: 16px; flex-shrink: 0; }
 .private-booking { margin: 4px 0; }
 .private-booking > summary { display: flex; align-items: center; gap: 12px; padding: 18px 0; cursor: pointer; list-style: none; }
 .private-booking > summary::-webkit-details-marker { display: none; }

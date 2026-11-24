@@ -23,11 +23,12 @@ export function bookingDetails(b, {canForget = false} = {}) {
       <div class="booking-total-row"><div><span>${paid ? "Тестовая оплата" : "Стоимость брони"}</span>
         ${paid ? html`<p>Деньги не списывались</p>` : ""}</div><strong>${money(b.total)}</strong></div>
     </div>
-    ${b.is_demo ? html`<div class="booking-demo-note">${icon("info")}<div><strong>Демонстрационная бронь</strong><p>Это тестовый бокс. Приезжать никуда не нужно.</p></div></div>` : html`
-      <section class="booking-info-row">${icon("pin")}<div><h3>Адрес</h3><p>${b.garage.address || "Адрес пока не указан"}</p>
-        ${b.arrival?.can_show_route ? html`<a class="booking-route" href="${mapUrl(b.garage)}" target="_blank" rel="noopener noreferrer">${icon("route")}Построить маршрут</a>` : ""}</div></section>
+    ${b.is_demo ? html`<div class="booking-demo-note">${icon("info")}<div><strong>Демонстрационная бронь</strong><p>Это тестовый бокс. Приезжать никуда не нужно.</p></div></div>` : ""}
+    <section class="booking-info-row">${icon("pin")}<div><h3>Адрес</h3><p>${b.garage.address || "Адрес пока не указан"}</p>
+      ${b.garage.address ? html`<a class="btn secondary booking-route" href="${mapUrl(b.garage)}" target="_blank" rel="noopener noreferrer">${icon("route")}Посмотреть на Яндекс Картах</a>` : ""}</div></section>
+    ${!b.is_demo ? html`
       <section class="booking-info-row">${icon("garage")}<div><h3>Как попасть в бокс</h3>
-        <p class="arrival-instructions">${b.arrival?.instructions || (b.is_past ? "Бронирование завершено." : b.status === "pending" ? "Инструкция будет доступна после подтверждения брони." : "Эта бронь не даёт права на вход.")}</p></div></section>`}
+        <p class="arrival-instructions">${b.arrival?.instructions || (b.is_past ? "Бронирование завершено." : b.status === "pending" ? "Инструкция будет доступна после подтверждения брони." : "Эта бронь не даёт права на вход.")}</p></div></section>` : ""}
     ${b.comment ? html`<div class="booking-demo-note">${icon("info")}<div><strong>Причина отказа</strong><p>${b.comment}</p></div></div>` : ""}
     <section class="booking-info-row booking-support">${icon("phone")}<div><h3>Поддержка</h3><p>${b.support?.message || "Поддержка скоро появится"}</p></div></section>
     ${b.access_token ? html`<details class="private-booking"><summary>${icon("share")}<span><strong>Личная ссылка на бронь</strong><small>Для другого устройства</small></span>${icon("down")}</summary><div class="private-booking-body">
