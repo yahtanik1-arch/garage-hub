@@ -2,8 +2,8 @@ import {html, $} from "./dom.js";
 import {dayLong, hhmm} from "./format.js";
 import {boot} from "./ui.js";
 import {savedBookings, loadBookings, rememberBooking, forgetBooking, validToken} from "./bookings-store.js";
-import {openBookingDialog, statusText} from "./booking-details.js";
-import {checkout} from "./payment.js";
+import {openBookingDialog, statusText} from "./booking-details.js?v=20261124-maps";
+import {checkout} from "./payment.js?v=20261124-maps";
 
 boot();
 const root = $("#my-bookings");

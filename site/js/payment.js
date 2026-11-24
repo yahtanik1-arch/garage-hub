@@ -1,6 +1,6 @@
 import { html, $, $$, safeStorage } from "./dom.js";
 import { dayLong, hhmm, money } from "./format.js";
-import { bookingConfirmation } from "./booking-details.js";
+import { bookingConfirmation } from "./booking-details.js?v=20261124-maps";
 import { rememberBooking } from "./bookings-store.js";
 
 const storage = safeStorage("session");

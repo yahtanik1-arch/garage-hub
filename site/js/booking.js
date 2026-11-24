@@ -3,8 +3,8 @@ import { dayLong, hhmm, money } from "./format.js";
 import { DEMO } from "./data.js";
 import { wirePhone } from "./phone.js";
 import { rememberBooking } from "./bookings-store.js";
-import { bookingConfirmation } from "./booking-details.js";
-import { checkout, resumePayment } from "./payment.js";
+import { bookingConfirmation } from "./booking-details.js?v=20261124-maps";
+import { checkout, resumePayment } from "./payment.js?v=20261124-maps";
 
 export function bookingForm(av, demoPayment = false) {
   if (!av?.days?.length) return html`<p class="note">Расписание сейчас недоступно. Обновите страницу перед бронированием.</p>`;
@@ -93,7 +93,7 @@ export function wireBooking(root, g, av) {
       if (!response.ok) throw new Error(b.error?.message || "Не удалось отправить заявку.");
       rememberBooking(b);
       if (b.payment?.mode === "demo" && b.payment.status === "paid" && b.status === "confirmed") {
-        const { receipt } = await import("./payment.js"); receipt(form, b); return;
+        const { receipt } = await import("./payment.js?v=20261124-maps"); receipt(form, b); return;
       }
       if (b.payment?.mode === "demo" && b.status === "pending" && b.payment.status === "awaiting") {
         checkout(form, b, reset);

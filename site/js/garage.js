@@ -2,7 +2,7 @@ import { html, $, $$ } from "./dom.js";
 import { dayNumber, hhmm, mapUrl, money, SIZES, TOOLS, TYPES, weekdayShort } from "./format.js";
 import { icon } from "./icons.js";
 import * as data from "./data.js";
-import { bookingForm, wireBooking } from "./booking.js";
+import { bookingForm, wireBooking } from "./booking.js?v=20261124-maps";
 import { availabilityLine, boot, catalogUrl, errorState, photo, watchImages } from "./ui.js";
 
 boot();
