@@ -18,8 +18,8 @@ async function request(token, action) {
   return b;
 }
 
-export function receipt(form, b) {
-  bookingConfirmation(form, b, () => { storage.removeItem(key(b.garage.id)); location.reload(); });
+export function receipt(form, b, options) {
+  bookingConfirmation(form, b, () => { storage.removeItem(key(b.garage.id)); location.reload(); }, options);
 }
 
 export function checkout(form, b, onCancel, onPaid) {
@@ -91,8 +91,15 @@ export async function resumePayment(form, garageId, onCancel) {
   if (!token) return;
   try {
     const b = await request(token);
-    if (b.status === "confirmed" && b.payment.status === "paid") { receipt(form, b); }
-    else if (b.status === "pending" && b.payment.status === "awaiting") checkout(form, b, onCancel);
+    rememberBooking(b);
+    if (b.is_past) storage.removeItem(key(garageId));
+    else if (b.status === "confirmed" && b.payment.status === "paid") receipt(form, b, {autoOpen: false});
+    else if (b.status === "pending" && b.payment.status === "awaiting") {
+      const result = $(".booking-result", form);
+      result.innerHTML = String(html`<p>У вас есть бронь, ожидающая тестовой оплаты.</p>
+        <div class="booking-confirmation-actions"><button type="button" class="btn secondary" data-resume-payment>Продолжить оплату</button></div>`);
+      $("[data-resume-payment]", result).onclick = () => checkout(form, b, onCancel);
+    }
     else storage.removeItem(key(garageId));
   } catch {
     // Keep the capability after a network failure so reload can recover the payment.
