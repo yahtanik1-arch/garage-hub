@@ -1,4 +1,9 @@
 # Заменить домены и пути сертификатов перед установкой. Рабочая структура конфигурации VPS.
+map $uri $garagehub_static_cache_control {
+    default "";
+    ~*\.(html|css|js)$ "no-cache";
+}
+
 server {
     listen 80;
     server_name garagehub.example.com;
@@ -17,6 +22,7 @@ server {
     client_max_body_size 64k;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy same-origin always;
+    add_header Cache-Control $garagehub_static_cache_control always;
     location ^~ /.well-known/acme-challenge/ { root /var/www/acme; }
     location ~ /\. { deny all; }
     location /api/ {
@@ -63,6 +69,7 @@ server {
     client_max_body_size 64k;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy same-origin always;
+    add_header Cache-Control $garagehub_static_cache_control always;
     location ^~ /.well-known/acme-challenge/ { root /var/www/acme; }
     location ~ /\. { deny all; }
     location /api/ {
