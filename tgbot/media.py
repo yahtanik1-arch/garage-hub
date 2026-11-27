@@ -15,6 +15,8 @@ def image(name: str) -> Union[str, FSInputFile]:
 
 
 def remember(name: str, message: Optional[Message]) -> None:
+    if message is not None and getattr(message.bot.session, "platform", "") == "vk":
+        return
     if name not in _file_ids and message is not None and message.photo:
         _file_ids[name] = message.photo[-1].file_id
 

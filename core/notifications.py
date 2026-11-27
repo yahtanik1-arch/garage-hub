@@ -14,7 +14,7 @@ async def render_notification(row):
     kind = p["kind"]
     if kind == "ops_alert":
         return {"queue_delayed": "Задержка очереди открытия: проверьте worker и сроки команд.",
-                "notifications_delayed": "Уведомления задерживаются: проверьте связь с Telegram.",
+                "notifications_delayed": "Уведомления задерживаются: проверьте связь с мессенджерами.",
                 "telemetry_stale": "Состояние замка устарело: проверьте связь и журнал устройства."}[p["code"]], None
     if kind in ("command", "command_alert"):
         c = await db.lock_command(p["command_id"])
@@ -43,13 +43,35 @@ async def render_notification(row):
     return t.my_booking_card(b, g, start, end), kb.my_bookings_link()
 
 
+async def send_actor_message(bot, actor_id, text, markup=None, seed=None, **kwargs):
+    if actor_id < 0:
+        from vkbot.client import VKClient
+        client = getattr(getattr(bot, "session", None), "vk", None)
+        owned = client is None
+        client = client or VKClient()
+        try:
+            return await client.send(-actor_id, text, markup, seed=seed)
+        finally:
+            if owned:
+                await client.close()
+    if bot is None:
+        raise RuntimeError("Messenger delivery is not configured")
+    return await bot.send_message(actor_id, text, reply_markup=markup, **kwargs)
+
+
 async def deliver_one(bot, booking_id=None):
-    row = await db.claim_notification(booking_id)
+    from core.config import VK_TOKEN
+    session = getattr(bot, "session", None)
+    has_telegram = bot is not None and (getattr(session, "platform", "") != "vk" or session.vk.telegram is not None)
+    channels = (["telegram"] if has_telegram else []) + (["vk"] if VK_TOKEN else [])
+    if not channels:
+        return None
+    row = await db.claim_notification(booking_id, channels)
     if not row:
         return None
     try:
         text, markup = await render_notification(row)
-        await bot.send_message(row["recipient_id"], text, reply_markup=markup)
+        await send_actor_message(bot, row["recipient_id"], text, markup, seed="notification:%s" % row["id"])
     except Exception:
         log.warning("notification_delivery_failed id=%s attempt=%s", row["id"], row["attempts"])
         await db.finish_notification(row, False)

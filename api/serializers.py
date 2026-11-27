@@ -99,6 +99,8 @@ def booking_admin(b: dict, g: Optional[dict]) -> dict:
     created = parse_dt(b["created_at"]) if b.get("created_at") else None
     data.update({
         "client_id": b["client_telegram_id"],
+        "client_vk_id": b.get("client_vk_id"),
+        "channel": "vk" if b.get("client_vk_id") else "telegram" if b["client_telegram_id"] else "website",
         "client_username": b.get("client_username") or "",
         "client_name": b.get("web_client_name") or "",
         "client_phone": b.get("web_client_phone") or "",
@@ -118,5 +120,6 @@ def lead_json(r: dict) -> dict:
         "object_type": r.get("object_type") or "",
         "address": r.get("address") or "",
         "telegram": r.get("telegram_username") or "",
+        "vk_id": r.get("vk_id"),
         "created_at": r.get("created_at"),
     }

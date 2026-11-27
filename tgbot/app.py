@@ -44,7 +44,7 @@ def setup_logging() -> None:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
-def build_dispatcher() -> Dispatcher:
+def build_dispatcher(error_handler=None) -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage(), events_isolation=SimpleEventIsolation())
     # Порядок важен: сначала меню (срабатывает в любом состоянии), потом сценарии.
     dp.include_routers(
@@ -56,7 +56,7 @@ def build_dispatcher() -> Dispatcher:
         search.router,
         owners.router,
     )
-    dp.errors.register(on_error)
+    dp.errors.register(error_handler or on_error)
     return dp
 
 

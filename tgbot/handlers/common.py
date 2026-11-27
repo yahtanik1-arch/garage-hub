@@ -30,7 +30,7 @@ async def show_home(message: Message, user_id: int, state: FSMContext, first_nam
         await show_dashboard(message)
         return
     sent = await message.answer_photo(
-        photo=media.image("cover"), caption=t.start_text(first_name) + (t.APP_HINT if webapp_url() else ""), reply_markup=kb.user_menu(),
+        photo=media.image("cover"), caption=t.start_text(first_name) + (t.APP_HINT if webapp_url() and getattr(message.bot.session, "platform", "") != "vk" else ""), reply_markup=kb.user_menu(),
     )
     media.remember("cover", sent)
 
@@ -61,11 +61,19 @@ async def cmd_start(message: Message, state: FSMContext):
 @router.message(Command("id"))
 async def cmd_id(message: Message):
     """Показывает человеку его Telegram ID — нужен, чтобы выдать права админа."""
-    await message.answer(t.your_id(message.from_user.id))
+    if getattr(message.bot.session, "platform", "") == "vk":
+        await message.answer("Ваш VK ID: %s" % -message.from_user.id)
+    else:
+        await message.answer(t.your_id(message.from_user.id))
 
 
 @router.message(Command("app"))
 async def cmd_app(message: Message):
+    if getattr(message.bot.session, "platform", "") == "vk":
+        from core.config import WEBSITE_URL
+        await message.answer("Сайт GarageHub: " + WEBSITE_URL if WEBSITE_URL else
+                             "Сайт пока не указан. Бронируйте через меню бота.")
+        return
     markup = kb.open_app()
     if markup:
         await message.answer(t.APP_OPEN, reply_markup=markup)

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional
 
 from core.config import ADMIN_IDS, supabase
+from core.actors import admin_actor_ids, event_key
 
 ACTIVE_STATUSES = ["pending", "confirmed"]
 
@@ -52,6 +53,9 @@ async def garages_by_ids(ids: Iterable) -> Dict[int, dict]:
 
 
 async def create_garage(data: dict) -> Optional[dict]:
+    if event_key.get():
+        data = {**data, "vk_request_id": event_key.get()}
+        return _first(await _run(_garages().upsert(data, on_conflict="vk_request_id")))
     return _first(await _run(_garages().insert(data)))
 
 
@@ -109,7 +113,7 @@ async def create_booking(data: dict) -> Optional[dict]:
 
 async def register_booking(data: dict) -> Optional[dict]:
     """Заявка и уведомления сохраняются одной транзакцией, без вызовов Telegram."""
-    return _first(await rpc("gh_booking_create", p_data=data, p_admins=ADMIN_IDS))
+    return _first(await rpc("gh_booking_create", p_data=data, p_admins=admin_actor_ids()))
 
 
 async def mark_booking(booking_id, field: str) -> None:
@@ -134,7 +138,7 @@ async def bookings_between(start: datetime, end: datetime,
 async def client_bookings(client_id: int, limit: int = 30) -> List[dict]:
     return await _run(
         _bookings().select("*")
-        .eq("client_telegram_id", client_id)
+        .eq("client_vk_id" if client_id < 0 else "client_telegram_id", abs(client_id))
         .order("start_time", desc=True)
         .limit(limit)
     )
@@ -176,6 +180,8 @@ def _owner_requests():
 
 
 async def create_owner_request(data: dict) -> Optional[dict]:
+    if data.get("vk_request_id"):
+        return _first(await _run(_owner_requests().upsert(data, on_conflict="vk_request_id")))
     return _first(await _run(_owner_requests().insert(data)))
 
 
@@ -211,7 +217,7 @@ async def rpc(name: str, **params):
 
 async def decide_booking(booking_id: int, status: str, actor_id: int, reason=None):
     return _first(await rpc("gh_booking_decide", p_booking_id=booking_id, p_status=status,
-        p_actor_id=actor_id, p_reason=reason, p_admins=ADMIN_IDS))
+        p_actor_id=actor_id, p_reason=reason, p_admins=admin_actor_ids()))
 
 
 async def issue_unlock_action(booking_id: int, user_id: int):
@@ -254,11 +260,11 @@ async def claim_lock_command():
 
 async def finish_lock_command(command_id: str, state: str, code: str):
     return _first(await rpc("gh_finish_command", p_command_id=command_id,
-        p_state=state, p_code=code, p_admins=ADMIN_IDS))
+        p_state=state, p_code=code, p_admins=admin_actor_ids()))
 
 
 async def recover_lock_commands():
-    return await rpc("gh_recover_commands", p_admins=ADMIN_IDS)
+    return await rpc("gh_recover_commands", p_admins=admin_actor_ids())
 
 
 async def record_device_event(**params):
@@ -269,8 +275,30 @@ async def resolve_lock_command(**params):
     return _first(await rpc("gh_resolve_command", **params))
 
 
-async def claim_notification(booking_id=None):
-    return _first(await rpc("gh_claim_notification", p_booking_id=booking_id))
+async def claim_notification(booking_id=None, channels=None):
+    if channels is None or channels == ["telegram"]:
+        return _first(await rpc("gh_claim_notification", p_booking_id=booking_id))
+    return _first(await rpc("gh_claim_channel_notification", p_booking_id=booking_id, p_channels=channels))
+
+
+async def vk_event_save(group_id, event_id, payload):
+    obj = payload["object"]
+    user_id = obj["message"]["from_id"] if payload["type"] == "message_new" else obj["user_id"]
+    await _run(supabase.table("vk_events").upsert(
+        {"group_id": group_id, "user_id": user_id, "event_id": event_id, "payload": payload},
+        on_conflict="group_id,event_id", ignore_duplicates=True))
+
+
+async def vk_event_claim(group_id):
+    return _first(await rpc("gh_claim_vk_event", p_group_id=group_id))
+
+
+async def vk_event_finish(row, success):
+    await rpc("gh_finish_vk_event", p_id=row["id"], p_attempt=row["attempts"], p_success=success)
+
+
+async def booking_by_vk_request(request_id):
+    return _first(await _run(_bookings().select("*").eq("vk_request_id", request_id).limit(1)))
 
 
 async def finish_notification(row: dict, sent: bool):
@@ -292,7 +320,7 @@ async def lock_overview():
 
 
 async def worker_tick():
-    await rpc("gh_worker_tick", p_admins=ADMIN_IDS)
+    await rpc("gh_worker_tick", p_admins=admin_actor_ids())
 
 
 async def website_bookings(tokens):
@@ -303,4 +331,4 @@ async def website_bookings(tokens):
 
 
 async def cancel_website_booking(token):
-    return _first(await rpc("gh_cancel_website_booking", p_token=token, p_admins=ADMIN_IDS))
+    return _first(await rpc("gh_cancel_website_booking", p_token=token, p_admins=admin_actor_ids()))

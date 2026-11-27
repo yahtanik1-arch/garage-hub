@@ -11,7 +11,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 
 from core import db, notifications
-from core.config import APP_ENV, LOCK_PROVIDER, TELEGRAM_PROXY_URL, TOKEN
+from core.config import APP_ENV, LOCK_PROVIDER, TELEGRAM_PROXY_URL, TOKEN, VK_TOKEN
 
 log = logging.getLogger(__name__)
 
@@ -71,13 +71,15 @@ class Worker:
 
 
 async def main(scenario="success"):
-    if not TOKEN:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN не найден в .env")
+    if not TOKEN and not VK_TOKEN:
+        raise RuntimeError("Нужен TELEGRAM_BOT_TOKEN или VK_GROUP_TOKEN в .env")
     adapter = None
     if LOCK_PROVIDER == "simulator":
         from core.lock_simulator import LockSimulator
         adapter = LockSimulator(scenario)
-    if APP_ENV == "local":
+    if not TOKEN:
+        bot = None
+    elif APP_ENV == "local":
         from tools.local_bot import LocalBot
         bot = LocalBot(TOKEN)
     else:
@@ -94,7 +96,8 @@ async def main(scenario="success"):
     finally:
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.remove_signal_handler(sig)
-        await bot.session.close()
+        if bot is not None:
+            await bot.session.close()
 
 
 if __name__ == "__main__":

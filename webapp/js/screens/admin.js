@@ -53,7 +53,7 @@ function shiftDay(iso, delta) {
 /* ── Заявки ─────────────────────────────────────────────── */
 
 function request(b) {
-  const client = b.client_phone ? html`${b.client_name}, <a data-action="call" data-phone="${b.client_phone}">${b.client_phone}</a>` : b.client_username ? html`<a data-action="tg" data-handle="${b.client_username}">@${b.client_username}</a>` : html`id ${b.client_id}`;
+  const client = b.client_vk_id ? html`ВКонтакте: vk.com/id${b.client_vk_id}` : b.client_phone ? html`${b.client_name}, <a data-action="call" data-phone="${b.client_phone}">${b.client_phone}</a>` : b.client_username ? html`<a data-action="tg" data-handle="${b.client_username}">@${b.client_username}</a>` : html`id ${b.client_id}`;
   return html`
     <article class="req" data-id="${b.id}">
       <div class="top">
@@ -170,7 +170,7 @@ function leadsMarkup() {
   return html`<div class="rows">${items.leads.map((r) => html`
     <article class="req" data-id="${r.id}">
       <div class="top"><div class="grow"><div style="font-weight:600">${r.name}</div><div class="mt-xs">${r.address}</div></div><span class="status pending">${r.object_type}</span></div>
-      <div class="owner"><a data-action="call" data-phone="${r.phone}">${r.phone}</a>${isHandle(r.telegram) ? html`, <a data-action="tg" data-handle="${handle(r.telegram)}">@${handle(r.telegram)}</a>` : r.telegram ? html`, ${r.telegram}` : ""}</div>
+      <div class="owner"><a data-action="call" data-phone="${r.phone}">${r.phone}</a>${r.vk_id ? html`, ВКонтакте: vk.com/id${r.vk_id}` : isHandle(r.telegram) ? html`, <a data-action="tg" data-handle="${handle(r.telegram)}">@${handle(r.telegram)}</a>` : r.telegram ? html`, ${r.telegram}` : ""}</div>
       <div class="btns"><button class="btn secondary" data-action="leadDone" data-id="${r.id}">Отметить обработанной</button></div>
     </article>`)}</div>`;
 }
