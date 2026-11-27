@@ -1,0 +1,26 @@
+[Unit]
+Description=GarageHub VK Callback API and durable inbox
+After=network-online.target garagehub-postgrest.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=garagehub
+Group=garagehub
+WorkingDirectory=/opt/garagehub
+EnvironmentFile=/opt/garagehub/.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=VK_PORT=8083
+ExecStart=/opt/garagehub/venv/bin/python -m vkbot
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/garagehub/cache /opt/garagehub/logs /opt/garagehub/assets/garages
+
+[Install]
+WantedBy=multi-user.target

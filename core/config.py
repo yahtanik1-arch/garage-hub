@@ -48,6 +48,14 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))   # указать владельца
 # Дополнительные админы с теми же правами: EXTRA_ADMIN_IDS=111,222 в .env. ID узнать командой /id в боте.
 EXTRA_ADMIN_IDS = [int(x) for x in re.split(r"[,\s]+", os.getenv("EXTRA_ADMIN_IDS", "")) if x.strip().isdigit()]
 ADMIN_IDS = [ADMIN_ID] + [x for x in EXTRA_ADMIN_IDS if x != ADMIN_ID]
+# VK IDs are deliberately independent of Telegram administrators.
+VK_GROUP_ID = int(os.getenv("VK_GROUP_ID", "0"))
+VK_TOKEN = os.getenv("VK_GROUP_TOKEN", "").strip()
+VK_CALLBACK_SECRET = os.getenv("VK_CALLBACK_SECRET", "").strip()
+VK_CONFIRMATION_CODE = os.getenv("VK_CONFIRMATION_CODE", "").strip()
+VK_ADMIN_IDS = [int(x) for x in re.split(r"[,\s]+", os.getenv("VK_ADMIN_IDS", "")) if x.isdigit() and int(x) > 0]
+VK_PORT = int(os.getenv("VK_PORT", "8083"))
+WEBSITE_URL = os.getenv("WEBSITE_URL", "").strip().rstrip("/")
 ADMIN_TG = os.getenv("ADMIN_TG", "")
 ADMIN_PHONE = os.getenv("ADMIN_PHONE", "")
 

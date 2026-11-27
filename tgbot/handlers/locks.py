@@ -3,7 +3,7 @@ from aiogram import Router
 from aiogram.types import CallbackQuery
 
 from core import db, locks, service
-from core.config import ADMIN_IDS
+from core.utils import is_admin
 from core.utils import answer_quietly, edit_or_send
 from tgbot import keyboards as kb, texts as t
 from tgbot.callbacks import UnlockCb
@@ -23,7 +23,7 @@ async def on_unlock(callback: CallbackQuery, callback_data: UnlockCb):
             c = await locks.request_open(callback.from_user.id, action["booking_id"], action_id, "bot")
         elif callback_data.action == "status":
             c = await locks.command_for_user(callback_data.value, callback.from_user.id,
-                callback.from_user.id in ADMIN_IDS)
+                is_admin(callback.from_user.id))
         else:
             raise service.ServiceError("bad_action", "Неизвестное действие.")
     except service.ServiceError as error:

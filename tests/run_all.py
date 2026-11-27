@@ -18,6 +18,7 @@ SUITES = [
     ("Telegram через прокси и загрузка фото", "t_telegram_proxy.py"),
     ("Границы серверной конфигурации", "t_config.py"),
     ("Telegram webhook (без внешних сервисов)", "t_webhook.py"),
+    ("ВКонтакте: Callback API, сценарии и изоляция аккаунтов", "t_vk.py"),
     ("Разбор времени", "t_utils.py"),
     ("API Mini App", "t_api.py"),
     ("Сайт без Telegram и публичные заявки", "t_website.py"),

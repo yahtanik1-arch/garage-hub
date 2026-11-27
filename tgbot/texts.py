@@ -128,6 +128,8 @@ def location(g: dict) -> str:
 
 
 def username_label(username: Optional[str], user_id) -> str:
+    if user_id and int(user_id) < 0:
+        return f"vk.com/id{-int(user_id)}"
     return f"@{username}" if username else f"id {user_id}"
 
 
@@ -512,6 +514,8 @@ OWNER_DONE = (
 
 
 def owner_lead(r: dict) -> str:
+    contact = ("ВКонтакте: vk.com/id%s" % r["vk_id"] if r.get("vk_id") else
+               "Telegram: " + (r.get("telegram_username") or "—"))
     return (
         f"<b>Заявка на размещение №{r['id']}</b>\n"
         f"{DIVIDER}\n"
@@ -519,7 +523,7 @@ def owner_lead(r: dict) -> str:
         f"Телефон: {h(r.get('phone') or '—')}\n"
         f"Тип: {h(r.get('object_type') or '—')}\n"
         f"Адрес: {h(r.get('address') or '—')}\n"
-        f"Telegram: {h(r.get('telegram_username') or '—')}"
+        + h(contact)
     )
 
 
@@ -696,6 +700,8 @@ def ago(dt: datetime, current: datetime) -> str:
 
 
 def booking_client(b: dict) -> str:
+    if b.get("client_vk_id"):
+        return "ВКонтакте: vk.com/id%s" % b["client_vk_id"]
     if b.get("web_client_phone"):
         return f"{b.get('web_client_name') or 'Клиент сайта'} · {b['web_client_phone']}"
     return username_label(b.get("client_username"), b["client_telegram_id"])

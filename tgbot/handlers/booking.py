@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from core import db
+from core.actors import booking_actor
 from tgbot import keyboards as kb
 from core import service, locks
 from tgbot import texts as t
@@ -173,7 +174,7 @@ async def show_my_bookings(message: Message, user_id: int, edit: bool = False) -
 
 async def own_booking(callback: CallbackQuery, booking_id: int):
     b = await db.booking(booking_id)
-    if not b or b["client_telegram_id"] != callback.from_user.id:
+    if not b or booking_actor(b) != callback.from_user.id:
         await answer_quietly(callback, "Заявка не найдена.", alert=True)
         return None
     return b

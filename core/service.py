@@ -11,6 +11,7 @@ from aiogram import Bot
 from postgrest.exceptions import APIError
 
 from core import db
+from core.actors import admin_actor_ids, booking_actor, booking_identity, event_key
 from tgbot import keyboards as kb
 from tgbot import texts as t
 from core.config import ADMIN_IDS, BOOKING_WINDOW_DAYS
@@ -40,9 +41,10 @@ async def notify_admins(bot: Bot, text: str, markup=None, **kwargs) -> int:
     delivered = 0
     if bot is None:
         return delivered
-    for admin_id in ADMIN_IDS:
+    for admin_id in admin_actor_ids():
         try:
-            await bot.send_message(admin_id, text, reply_markup=markup, **kwargs)
+            from core.notifications import send_actor_message
+            await send_actor_message(bot, admin_id, text, markup, **kwargs)
             delivered += 1
         except Exception as e:
             log.warning("Админу %s сообщение не дошло: %s", admin_id, e)
@@ -136,7 +138,8 @@ async def create_booking_request(bot: Optional[Bot], user_id: Optional[int], use
         try:
             created = await db.register_booking({
                 "garage_id": g["id"],
-                "client_telegram_id": user_id,
+                **booking_identity(user_id),
+                **({"vk_request_id": event_key.get()} if user_id and user_id < 0 else {}),
                 "client_username": username,
                 "start_time": start.isoformat(),
                 "end_time": end.isoformat(),
@@ -170,27 +173,27 @@ async def create_booking_request(bot: Optional[Bot], user_id: Optional[int], use
 
 async def confirm_booking(bot: Bot, booking_id: int, actor_id: int):
     """pending → confirmed. None, если заявку уже обработали. Иначе (заявка, объект, доставлено ли клиенту)."""
-    if actor_id not in ADMIN_IDS:
+    if actor_id not in admin_actor_ids():
         raise ServiceError("forbidden", "Раздел только для администратора.", 403)
     b = await db.decide_booking(booking_id, "confirmed", actor_id)
     if not b:
         return None
     g = await db.garage(b["garage_id"]) or {}
     from core.notifications import try_booking_notification
-    delivered = await try_booking_notification(bot, booking_id) if b["client_telegram_id"] else False
+    delivered = await try_booking_notification(bot, booking_id) if booking_actor(b) else False
     return b, g, delivered
 
 
 async def reject_booking(bot: Bot, booking_id: int, reason: str, actor_id: int):
     """pending → rejected с причиной. None, если заявку уже обработали."""
-    if actor_id not in ADMIN_IDS:
+    if actor_id not in admin_actor_ids():
         raise ServiceError("forbidden", "Раздел только для администратора.", 403)
     b = await db.decide_booking(booking_id, "rejected", actor_id, reason)
     if not b:
         return None
     g = await db.garage(b["garage_id"]) or {}
     from core.notifications import try_booking_notification
-    delivered = await try_booking_notification(bot, booking_id) if b["client_telegram_id"] else False
+    delivered = await try_booking_notification(bot, booking_id) if booking_actor(b) else False
     return b, g, delivered
 
 
@@ -201,7 +204,7 @@ def can_cancel(b: dict) -> bool:
 async def cancel_booking(bot: Bot, user_id: int, booking_id: int) -> dict:
     """Клиент отменяет свою заявку; админу уходит уведомление."""
     b = await db.booking(booking_id)
-    if not b or b["client_telegram_id"] != user_id:
+    if not b or booking_actor(b) != user_id:
         raise ServiceError("not_found", "Заявка не найдена.", 404)
     if not can_cancel(b):
         raise ServiceError("closed", "Эту заявку уже нельзя отменить.", 409)
@@ -223,8 +226,9 @@ async def create_owner_request(bot: Bot, user_id: int, username: Optional[str], 
         "phone": phone,
         "object_type": t.object_type(object_type),
         "address": address,
-        "telegram_id": user_id,
-        "telegram_username": t.username_label(username, user_id),
+        "telegram_id": user_id if user_id > 0 else None,
+        **({"vk_id": -user_id, "vk_request_id": event_key.get()} if user_id < 0 else {}),
+        "telegram_username": t.username_label(username, user_id) if user_id > 0 else None,
     }
     saved = None
     try:

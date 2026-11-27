@@ -17,7 +17,8 @@ _client_view: Set[int] = set()
 
 
 def is_admin(user_id: int) -> bool:
-    return user_id in ADMIN_IDS
+    from core.actors import admin_actor_ids
+    return user_id in admin_actor_ids()
 
 
 def admin_view(user_id: int) -> bool:

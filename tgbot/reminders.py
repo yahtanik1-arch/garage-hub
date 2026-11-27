@@ -13,6 +13,8 @@ from datetime import timedelta
 from aiogram import Bot
 
 from core import db, service
+from core.actors import booking_actor
+from core.notifications import send_actor_message
 from tgbot import keyboards as kb
 from tgbot import texts as t
 from core.config import (
@@ -26,32 +28,42 @@ log = logging.getLogger(__name__)
 
 async def _send(bot: Bot, chat_id: int, text: str, markup=None) -> None:
     try:
-        await bot.send_message(chat_id, text, reply_markup=markup)
+        await send_actor_message(bot, chat_id, text, markup)
     except Exception as e:
         log.warning("Напоминание не доставлено %s: %s", chat_id, e)
 
 
 async def tick(bot: Bot) -> None:
     current = now()
+    vk = getattr(bot.session, "platform", "") == "vk"
+
+    def belongs(b):
+        return bool(b.get("client_vk_id")) == vk
 
     for b in await db.stale_pending(current - timedelta(minutes=ADMIN_REMIND_AFTER_MIN), "admin_reminded"):
+        if not belongs(b):
+            continue
         await db.mark_booking(b["id"], "admin_reminded")
         g = await db.garage(b["garage_id"]) or {}
         start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
         await service.notify_admins(bot, t.admin_reminder(b, g.get("name") or "—", start, end), kb.decide(b["id"]))
 
     for b in await db.stale_pending(current - timedelta(minutes=CLIENT_WAIT_NOTICE_MIN), "client_wait_notified"):
+        if not belongs(b):
+            continue
         await db.mark_booking(b["id"], "client_wait_notified")
-        if b["client_telegram_id"] and parse_dt(b["start_time"]) > current:
-            await _send(bot, b["client_telegram_id"], t.wait_notice(b["id"]), kb.my_bookings_link())
+        if booking_actor(b) and parse_dt(b["start_time"]) > current:
+            await _send(bot, booking_actor(b), t.wait_notice(b["id"]), kb.my_bookings_link())
 
     for b in await db.visits_starting(current, current + timedelta(minutes=VISIT_REMIND_BEFORE_MIN)):
+        if not belongs(b):
+            continue
         await db.mark_booking(b["id"], "visit_reminded")
-        if not b["client_telegram_id"]:
+        if not booking_actor(b):
             continue
         g = await db.garage(b["garage_id"]) or {}
         start, end = parse_dt(b["start_time"]), parse_dt(b["end_time"])
-        await _send(bot, b["client_telegram_id"], t.visit_reminder(g, start, end, current.date()), kb.after_confirm(g))
+        await _send(bot, booking_actor(b), t.visit_reminder(g, start, end, current.date()), kb.after_confirm(g))
 
 
 async def run(bot: Bot) -> None:

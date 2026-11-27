@@ -246,7 +246,8 @@ async def add_photo(message: Message, state: FSMContext):
                 await state.update_data(photos_limit_said=True)
                 await message.answer(t.PHOTOS_LIMIT.format(max=MAX_PHOTOS), reply_markup=kb.add_photos_done())
             return
-        photos.append(message.photo[-1].file_id)
+        if message.photo[-1].file_id not in photos:
+            photos.append(message.photo[-1].file_id)
         await state.update_data(draft=draft)
         await counter(message, state, len(photos), kb.add_photos_done())
 
